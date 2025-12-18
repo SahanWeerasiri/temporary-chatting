@@ -3,14 +3,117 @@ name: security-scan
 on: 
   push:
     branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  check-for-merge-conflicts:
+  security-scan-and-conflict-check:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Stop the merge
-      - run: exit 1
-  
-  
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper merge checking
+          
+      - name: Create temporary branch
+        run: |
+          # Create a unique branch name
+          BRANCH_NAME="temp-security-check-${{ github.event.pull_request.number || github.sha }}"
+          git checkout -b $BRANCH_NAME
+          
+      - name: Check for merge conflicts
+        id: check-conflicts
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PRs, try to merge with target branch
+            git fetch origin ${{ github.base_ref }}
+            
+            # Try to merge
+            if ! git merge origin/${{ github.base_ref }} --no-ff --no-commit; then
+              echo "CONFLICT_STATUS=has-conflicts" >> $GITHUB_OUTPUT
+              echo "Conflicts detected! Please resolve merge conflicts."
+              git merge --abort
+              exit 0
+            else
+              echo "CONFLICT_STATUS=no-conflicts" >> $GITHUB_OUTPUT
+              git merge --abort
+            fi
+          else
+            echo "CONFLICT_STATUS=no-conflicts" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Handle conflicts
+        if: steps.check-conflicts.outputs.CONFLICT_STATUS == 'has-conflicts'
+        run: |
+          echo "Merge conflicts detected. Cannot proceed with security scan."
+          echo "Please resolve conflicts before proceeding."
+          # You could add a comment to the PR here using GitHub API
+          
+      - name: Run security scan (when no conflicts)
+        if: steps.check-conflicts.outputs.CONFLICT_STATUS == 'no-conflicts'
+        id: security-scan
+        run: |
+          # Run your security scanning tools here
+          # Example with npm audit (adjust for your stack)
+          SECURITY_DECREASED=false
+          
+          # Example: Check for vulnerable dependencies
+          if [ -f "package.json" ]; then
+            npm audit --audit-level=high || SECURITY_DECREASED=true
+          fi
+          
+          # Add more security checks as needed
+          # - SAST tools
+          # - Dependency scanning
+          # - Secrets detection
+          
+          if [ "$SECURITY_DECREASED" = "true" ]; then
+            echo "SECURITY_STATUS=decreased" >> $GITHUB_OUTPUT
+            echo "Security scan failed - vulnerabilities detected"
+            exit 1
+          else
+            echo "SECURITY_STATUS=ok" >> $GITHUB_OUTPUT
+            echo "Security scan passed"
+          fi
+          
+      - name: Create issue for security problems
+        if: failure() && steps.security-scan.outputs.SECURITY_STATUS == 'decreased'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issue } = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Security Alert: PR #${{ github.event.pull_request.number }} introduces vulnerabilities`,
+              body: `Security scan failed for PR #${{ github.event.pull_request.number }}.\n\n` +
+                    `Please review and fix the security issues before merging.\n` +
+                    `PR Link: ${{ github.event.pull_request.html_url }}`,
+              labels: ['security', 'blocked']
+            });
+            
+            # Add comment to PR
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.pull_request.number }},
+              body: `🚫 **Security Scan Failed**\n\n` +
+                    `This PR introduces security vulnerabilities. ` +
+                    `Created issue #${issue.number} to track this. ` +
+                    `Please fix the issues before merging.`
+            });
+            
+      - name: Block PR on security failure
+        if: failure() && steps.security-scan.outputs.SECURITY_STATUS == 'decreased'
+        run: |
+          echo "Security vulnerabilities detected. PR cannot be merged."
+          echo "Review the created issue for details."
+          exit 1
+          
+      - name: Clean up temporary branch
+        if: always()
+        run: |
+          git checkout ${{ github.event.pull_request.base.ref || 'main' }}
+          BRANCH_NAME="temp-security-check-${{ github.event.pull_request.number || github.sha }}"
+          git branch -D $BRANCH_NAME 2>/dev/null || true
