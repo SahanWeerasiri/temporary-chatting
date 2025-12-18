@@ -1,0 +1,16 @@
+name: security-scan
+
+on: 
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  check-for-merge-conflicts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Stop the merge
+      - run: exit 1
+  
+  
