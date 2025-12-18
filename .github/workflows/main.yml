@@ -3,7 +3,7 @@ name: Security Scan
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main, master]
+    branches: [master]
 
 jobs:
   security-scan:
