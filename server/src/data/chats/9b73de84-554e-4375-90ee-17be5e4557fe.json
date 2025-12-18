@@ -1,0 +1,37 @@
+{
+  "id": "9b73de84-554e-4375-90ee-17be5e4557fe",
+  "user1Id": "d02db2d0-aee6-42c1-9ec1-049e7e72638b",
+  "user2Id": "cf7b000b-0a1c-4998-9488-18eabf203500",
+  "user1Username": "sahan",
+  "user2Username": "vihara",
+  "createdAt": "2025-12-18T06:55:03.104Z",
+  "isActive": false,
+  "messages": [
+    {
+      "id": "0d658396-2ea0-4971-9e89-216b41be3253",
+      "senderId": "cf7b000b-0a1c-4998-9488-18eabf203500",
+      "content": "hi",
+      "timestamp": "2025-12-18T06:57:08.589Z"
+    },
+    {
+      "id": "9dab11e5-9486-4674-9363-6baa05ef0936",
+      "senderId": "d02db2d0-aee6-42c1-9ec1-049e7e72638b",
+      "content": "love you",
+      "timestamp": "2025-12-18T06:57:19.525Z"
+    },
+    {
+      "id": "9af1cefa-a4ed-4e77-b908-35d3147da0e0",
+      "senderId": "cf7b000b-0a1c-4998-9488-18eabf203500",
+      "content": "love youu too",
+      "timestamp": "2025-12-18T06:57:31.704Z"
+    },
+    {
+      "id": "7da0243b-6f4c-4dbf-a54e-397c2f0189d2",
+      "senderId": "d02db2d0-aee6-42c1-9ec1-049e7e72638b",
+      "content": ":)",
+      "timestamp": "2025-12-18T06:57:41.610Z"
+    }
+  ],
+  "closedBy": "d02db2d0-aee6-42c1-9ec1-049e7e72638b",
+  "closedAt": "2025-12-18T06:57:48.399Z"
+}

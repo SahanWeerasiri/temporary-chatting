@@ -1,0 +1,20 @@
+[
+  {
+    "id": "d02db2d0-aee6-42c1-9ec1-049e7e72638b",
+    "username": "sahan",
+    "password": "$2a$10$rsrZjkleCdbuX47M5KZNx.FvZDwJM2fivlW5qhQr0ZKe.NYl9.qiu",
+    "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkMDJkYjJkMC1hZWU2LTQyYzEtOWVjMS0wNDllN2U3MjYzOGIiLCJ1c2VybmFtZSI6InNhaGFuIiwiaWF0IjoxNzY2MDM5ODA0LCJleHAiOjE3NjYxMjYyMDR9.kpedVYTESrsNYi2xbg9F1nqjGk3oXxnsoCEpty8xrJc",
+    "createdAt": "2025-12-18T06:36:44.005Z",
+    "pendingInvites": [],
+    "activeChats": []
+  },
+  {
+    "id": "cf7b000b-0a1c-4998-9488-18eabf203500",
+    "username": "vihara",
+    "password": "$2a$10$uLk0rojlEN1NwhhlB5D9Re29IMCEPa5kn/KPtvn1d4S8vzqMeq5uq",
+    "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjZjdiMDAwYi0wYTFjLTQ5OTgtOTQ4OC0xOGVhYmYyMDM1MDAiLCJ1c2VybmFtZSI6InZpaGFyYSIsImlhdCI6MTc2NjAzOTg1MCwiZXhwIjoxNzY2MTI2MjUwfQ.MmSLqbutacLuLBNGcNWpFtGwEKSIfoYQUv9h2_TrCa0",
+    "createdAt": "2025-12-18T06:37:30.125Z",
+    "pendingInvites": [],
+    "activeChats": []
+  }
+]
