@@ -39,7 +39,7 @@ jobs:
             - name: Git clone to server
               run: |
                   # Clone the repository on the server
-                  REMOTE_DIR="/temporary-chatting"
+                  REMOTE_DIR="/home/ubuntu/temporary-chatting"
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
                       "if [ -d $REMOTE_DIR/.git ]; then cd $REMOTE_DIR && git pull origin main; else git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git $REMOTE_DIR; fi"
