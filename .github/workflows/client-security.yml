@@ -74,11 +74,10 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
-            # Step-level condition - secrets are allowed here
             - name: Run Snyk Security Scan
               uses: snyk/actions/node@master
               with:
-                  args: --severity-threshold=high
+                  args: --severity-threshold=high --json-file-output=snyk-report.json
               env:
                   SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
               continue-on-error: true
