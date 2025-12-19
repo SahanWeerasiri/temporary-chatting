@@ -4,3 +4,4 @@ client/.env
 main.py
 ssh-key-2025-12-03.key
 ssh-key-2025-12-03.key.base64.txt
+dist/
