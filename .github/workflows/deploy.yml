@@ -1,0 +1,68 @@
+name: Deploy to Production
+
+on:
+    pull_request:
+        types:
+            - closed
+        branches:
+            - main # or 'master'
+        # Optional: Only deploy when specific paths change
+        paths:
+            - "server/**"
+            - "client/**"
+            - "deploy-scripts/**"
+            - ".github/workflows/deploy.yml"
+
+jobs:
+    deploy:
+        name: Deploy to Server
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Setup SSH
+              run: |
+                  # Create SSH key file
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.DEPLOY_SSH_KEY }}" | base64 --decode > ~/.ssh/deploy_key
+                  chmod 600 ~/.ssh/deploy_key
+
+                  # Add server to known hosts
+                  ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+                  # Test connection
+                  ssh -i ~/.ssh/deploy_key \
+                      -o StrictHostKeyChecking=no \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "echo 'SSH connection successful'"
+
+            - name: Git clone to server
+              run: |
+                  # Clone the repository on the server
+                  ssh -i ~/.ssh/deploy_key \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "git clone -b main https://github.com/your-repo/your-project.git /tmp/your-project"
+
+                  # build by npm on server
+                  ssh -i ~/.ssh/deploy_key \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "cd /temporary-chatting/client && npm install && npm run build"
+
+                  ssh -i ~/.ssh/deploy_key \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "pm2 stop all || true && pm2 start /temporary-chatting/client/dist/server.js --name temporary-chatting-client"
+
+                  ssh -i ~/.ssh/deploy_key \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "cd /temporary-chatting/server && npm install && npm run build"
+
+                  ssh -i ~/.ssh/deploy_key \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "pm2 stop all || true && pm2 start /temporary-chatting/server/dist/index.js --name temporary-chatting-server"
+
+                  ssh -i ~/.ssh/deploy_key \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "ufw allow 80/tcp && ufw allow 3000/tcp && ufw reload"
+
+                  ssh -i ~/.ssh/deploy_key \
+                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                      "pm2 save"
