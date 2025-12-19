@@ -12,6 +12,7 @@ on:
             - "client/**"
             - "deploy-scripts/**"
             - ".github/workflows/deploy.yml"
+    workflow_dispatch:
 
 jobs:
     deploy:
@@ -41,7 +42,7 @@ jobs:
                   REMOTE_DIR="$HOME/temporary-chatting"
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "cd $REMOTE_DIR && git pull origin main"
+                      "if [ -d $REMOTE_DIR/.git ]; then cd $REMOTE_DIR && git pull origin main; else git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git $REMOTE_DIR; fi"
 
                   # build by npm on server
                   ssh -i ~/.ssh/deploy_key \
