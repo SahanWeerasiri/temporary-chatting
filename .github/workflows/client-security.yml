@@ -1,10 +1,6 @@
 name: Client Security Checks
 
 on:
-    push:
-        paths:
-            - "client/**"
-            - ".github/workflows/client-security.yml"
     pull_request:
         paths:
             - "client/**"
