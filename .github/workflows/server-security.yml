@@ -78,7 +78,6 @@ jobs:
               run: npm ci
 
             - name: Run Snyk Security Scan (optional)
-              if: ${{ secrets.SNYK_TOKEN }}
               uses: snyk/actions/node@master
               with:
                   args: --severity-threshold=high --json-file-output=snyk-report.json

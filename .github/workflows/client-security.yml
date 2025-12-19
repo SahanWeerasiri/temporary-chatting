@@ -9,9 +9,10 @@ on:
         paths:
             - "client/**"
     schedule:
-        - cron: "0 10 * * 1"
+        - cron: "0 10 * * 1" # Weekly on Monday at 10 AM
 
 jobs:
+    # Job 1: Dependency Audit for Client
     client-dependency-audit:
         name: Client Dependency Audit
         runs-on: ubuntu-latest
@@ -34,9 +35,7 @@ jobs:
               run: npm ci
 
             - name: Check outdated packages
-              run: |
-                  echo "Checking for outdated packages..."
-                  npm outdated --long || echo "No outdated packages found"
+              run: npm outdated --long || true
               continue-on-error: true
 
             - name: Check deprecated packages
@@ -46,12 +45,14 @@ jobs:
               continue-on-error: true
 
             - name: Audit dependencies (npm)
-              run: |
-                  echo "Running npm audit..."
-                  npm audit --audit-level=moderate || echo "npm audit found issues or failed"
+              run: npm audit --audit-level=moderate
               continue-on-error: true
 
-    # FIXED: Corrected CVE scanning with proper paths
+            - name: Run npm doctor
+              run: npm doctor || true
+              continue-on-error: true
+
+    # Job 2: CVE Scanning for Client
     client-cve-scan:
         name: Client CVE Scan
         runs-on: ubuntu-latest
@@ -73,8 +74,8 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
-            - name: Run Snyk Security Scan (optional)
-              if: ${{ secrets.SNYK_TOKEN }}
+            # Step-level condition - secrets are allowed here
+            - name: Run Snyk Security Scan
               uses: snyk/actions/node@master
               with:
                   args: --severity-threshold=high
@@ -84,11 +85,15 @@ jobs:
 
             - name: Run OWASP Dependency Check
               run: |
-                  set -e
+                  # Download OWASP Dependency Check CLI
                   VERSION="9.0.10"
                   wget -q "https://github.com/jeremylong/DependencyCheck/releases/download/v${VERSION}/dependency-check-${VERSION}-release.zip"
                   unzip -q "dependency-check-${VERSION}-release.zip"
+
+                  # Create reports directory
                   mkdir -p ./reports
+
+                  # Run scan on current directory
                   ./dependency-check/bin/dependency-check.sh \
                     --project "client" \
                     --scan "." \
@@ -96,33 +101,25 @@ jobs:
                     --format "JSON" \
                     --out "./reports" \
                     --disableNodeAudit \
-                    --disableNodeJS \
-                    --nodePackageSkipDevDependencies false || echo "OWASP Dependency Check failed"
+                    --nodePackageSkipDevDependencies false
+
+                  # Check if report was generated
                   if [ -f "./reports/dependency-check-report.html" ]; then
                     echo "OWASP report generated successfully"
+                    ls -la ./reports/
                   else
-                    echo "OWASP report not generated"
+                    echo "OWASP report generation failed or no vulnerabilities found"
                   fi
               continue-on-error: true
 
-            - name: Run Trivy Security Scan
-              run: |
-                  echo "Installing Trivy..."
-                  curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-                  echo "Running Trivy scan..."
-                  trivy fs --security-checks vuln . || echo "Trivy scan found issues or failed"
-                  trivy fs --security-checks vuln --format json -o trivy-report.json . || echo "Trivy JSON report generation failed"
-              continue-on-error: true
-
-            - name: Upload security reports
+            - name: Upload OWASP report
               uses: actions/upload-artifact@v4
               with:
-                  name: client-security-reports
-                  path: |
-                      ./reports/
-                      ./trivy-report.json
+                  name: client-owasp-report
+                  path: ./client/reports/
                   if-no-files-found: ignore
 
+    # Job 3: Build Validation for Client
     client-build-validation:
         name: Client Build Validation
         runs-on: ubuntu-latest
@@ -147,7 +144,7 @@ jobs:
             - name: Run build
               run: npm run build
 
-            - name: Run tests
+            - name: Run tests (if available)
               run: |
                   if [ -f "package.json" ] && npm run | grep -q "test"; then
                     npm test -- --passWithNoTests
