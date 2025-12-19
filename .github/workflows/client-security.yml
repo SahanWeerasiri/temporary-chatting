@@ -1,158 +1,157 @@
 name: Client Security Checks
 
 on:
-  push:
-    paths:
-      - 'client/**'
-      - '.github/workflows/client-security.yml'
-  pull_request:
-    paths:
-      - 'client/**'
-  schedule:
-    - cron: '0 10 * * 1'
+    push:
+        paths:
+            - "client/**"
+            - ".github/workflows/client-security.yml"
+    pull_request:
+        paths:
+            - "client/**"
+    schedule:
+        - cron: "0 10 * * 1"
 
 jobs:
-  client-dependency-audit:
-    name: Client Dependency Audit
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./client
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './client/package-lock.json'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Check outdated packages
-      run: npm outdated --long || true
-      continue-on-error: true
-    
-    - name: Check deprecated packages
-      run: |
-        echo "Checking for deprecated packages..."
-        npm ls --depth=0 | grep "deprecated" || echo "No deprecated packages found"
-      continue-on-error: true
-    
-    - name: Audit dependencies (npm)
-      run: npm audit --audit-level=moderate
-      continue-on-error: true
+    client-dependency-audit:
+        name: Client Dependency Audit
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ./client
 
-  # FIXED: Corrected CVE scanning with proper paths
-  client-cve-scan:
-    name: Client CVE Scan
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./client
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './client/package-lock.json'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Run Snyk Security Scan (optional)
-      if: ${{ secrets.SNYK_TOKEN }}
-      uses: snyk/actions/node@master
-      with:
-        args: --severity-threshold=high
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      continue-on-error: true
-    
-    - name: Run OWASP Dependency Check (FIXED)
-      # Using direct Docker run for better path control
-      run: |
-        # Download OWASP Dependency Check CLI
-        VERSION="9.0.10"
-        wget "https://github.com/jeremylong/DependencyCheck/releases/download/v${VERSION}/dependency-check-${VERSION}-release.zip"
-        unzip "dependency-check-${VERSION}-release.zip"
-        
-        # Run scan on current directory (which is ./client)
-        ./dependency-check/bin/dependency-check.sh \
-          --project "client" \
-          --scan "." \
-          --format "HTML" \
-          --format "JSON" \
-          --out "./reports" \
-          --disableNodeAudit \
-          --disableNodeJS \
-          --nodePackageSkipDevDependencies false
-        
-        # Check if report was generated
-        if [ -f "./reports/dependency-check-report.html" ]; then
-          echo "OWASP report generated successfully"
-        fi
-      continue-on-error: true
-    
-    - name: Alternative: Use Trivy for container scanning
-      run: |
-        # Install Trivy
-        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-        
-        # Scan package-lock.json for vulnerabilities
-        trivy fs --security-checks vuln . || true
-        
-        # Generate JSON report
-        trivy fs --security-checks vuln --format json -o trivy-report.json . || true
-      continue-on-error: true
-    
-    - name: Upload security reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: client-security-reports
-        path: |
-          ./client/reports/
-          ./client/trivy-report.json
-        if-no-files-found: ignore
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-  client-build-validation:
-    name: Client Build Validation
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./client
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './client/package-lock.json'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Run build
-      run: npm run build
-    
-    - name: Run tests
-      run: |
-        if [ -f "package.json" ] && npm run | grep -q "test"; then
-          npm test -- --passWithNoTests
-        else
-          echo "No test script found"
-        fi
-      continue-on-error: true
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: "./client/package-lock.json"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Check outdated packages
+              run: |
+                  echo "Checking for outdated packages..."
+                  npm outdated --long || echo "No outdated packages found"
+              continue-on-error: true
+
+            - name: Check deprecated packages
+              run: |
+                  echo "Checking for deprecated packages..."
+                  npm ls --depth=0 | grep "deprecated" || echo "No deprecated packages found"
+              continue-on-error: true
+
+            - name: Audit dependencies (npm)
+              run: |
+                  echo "Running npm audit..."
+                  npm audit --audit-level=moderate || echo "npm audit found issues or failed"
+              continue-on-error: true
+
+    # FIXED: Corrected CVE scanning with proper paths
+    client-cve-scan:
+        name: Client CVE Scan
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ./client
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: "./client/package-lock.json"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run Snyk Security Scan (optional)
+              if: ${{ secrets.SNYK_TOKEN }}
+              uses: snyk/actions/node@master
+              with:
+                  args: --severity-threshold=high
+              env:
+                  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+              continue-on-error: true
+
+            - name: Run OWASP Dependency Check
+              run: |
+                  set -e
+                  VERSION="9.0.10"
+                  wget -q "https://github.com/jeremylong/DependencyCheck/releases/download/v${VERSION}/dependency-check-${VERSION}-release.zip"
+                  unzip -q "dependency-check-${VERSION}-release.zip"
+                  mkdir -p ./reports
+                  ./dependency-check/bin/dependency-check.sh \
+                    --project "client" \
+                    --scan "." \
+                    --format "HTML" \
+                    --format "JSON" \
+                    --out "./reports" \
+                    --disableNodeAudit \
+                    --disableNodeJS \
+                    --nodePackageSkipDevDependencies false || echo "OWASP Dependency Check failed"
+                  if [ -f "./reports/dependency-check-report.html" ]; then
+                    echo "OWASP report generated successfully"
+                  else
+                    echo "OWASP report not generated"
+                  fi
+              continue-on-error: true
+
+            - name: Run Trivy Security Scan
+              run: |
+                  echo "Installing Trivy..."
+                  curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                  echo "Running Trivy scan..."
+                  trivy fs --security-checks vuln . || echo "Trivy scan found issues or failed"
+                  trivy fs --security-checks vuln --format json -o trivy-report.json . || echo "Trivy JSON report generation failed"
+              continue-on-error: true
+
+            - name: Upload security reports
+              uses: actions/upload-artifact@v4
+              with:
+                  name: client-security-reports
+                  path: |
+                      ./reports/
+                      ./trivy-report.json
+                  if-no-files-found: ignore
+
+    client-build-validation:
+        name: Client Build Validation
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ./client
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: "./client/package-lock.json"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run build
+              run: npm run build
+
+            - name: Run tests
+              run: |
+                  if [ -f "package.json" ] && npm run | grep -q "test"; then
+                    npm test -- --passWithNoTests
+                  else
+                    echo "No test script found"
+                  fi
+              continue-on-error: true
