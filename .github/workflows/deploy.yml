@@ -39,7 +39,7 @@ jobs:
               run: |
                   # Create SSH key file
                   mkdir -p ~/.ssh
-                  echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+                  echo "${{ secrets.DEPLOY_SSH_KEY }}" | base64 --decode > ~/.ssh/deploy_key
                   chmod 600 ~/.ssh/deploy_key
 
                   # Add server to known hosts
