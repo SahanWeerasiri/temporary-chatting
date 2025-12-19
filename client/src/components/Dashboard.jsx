@@ -69,7 +69,7 @@ const Dashboard = ({ user, onLogout }) => {
                                 onClick={() => setShowInviteModal(true)}
                                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                             >
-                                Invite User
+                                Invite Users
                             </button>
                             <button
                                 onClick={handleLogout}
