@@ -1,70 +1,97 @@
 name: Deploy to Production
 
 on:
-    pull_request:
-        types:
-            - closed
-        branches:
-            - main # or 'master'
-        # Optional: Only deploy when specific paths change
-        paths:
-            - "server/**"
-            - "client/**"
-            - "deploy-scripts/**"
-            - ".github/workflows/deploy.yml"
-    workflow_dispatch:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "client/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
 
 jobs:
-    deploy:
-        name: Deploy to Server
-        runs-on: ubuntu-latest
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Setup SSH
-              run: |
-                  # Create SSH key file
-                  mkdir -p ~/.ssh
-                  echo "${{ secrets.DEPLOY_SSH_KEY }}" | base64 --decode > ~/.ssh/deploy_key
-                  chmod 600 ~/.ssh/deploy_key
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | base64 --decode > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
-                  # Add server to known hosts
-                  ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-
-                  # Test connection
-                  ssh -i ~/.ssh/deploy_key \
-                      -o StrictHostKeyChecking=no \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "echo 'SSH connection successful'"
-
-            - name: Git clone to server
-              run: |
-                  # Clone the repository on the server
-                  REMOTE_DIR="/home/ubuntu/temporary-chatting"
-                  ssh -i ~/.ssh/deploy_key \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "if [ -d $REMOTE_DIR/.git ]; then cd $REMOTE_DIR && git pull origin main --no-rebase; else git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git $REMOTE_DIR; fi"
-
-                  # build by npm on server
-                  ssh -i ~/.ssh/deploy_key \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "cd $REMOTE_DIR/client && npm install && npm run build"
-
-                  ssh -i ~/.ssh/deploy_key \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "pm2 stop temporary-chatting-client || true && pm2 start $REMOTE_DIR/client/dist/server.js --name temporary-chatting-client"
-
-                  ssh -i ~/.ssh/deploy_key \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "cd $REMOTE_DIR/server && npm install"
-
-                  ssh -i ~/.ssh/deploy_key \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "pm2 stop temporary-chatting-server || true && pm2 start $REMOTE_DIR/server/server.js --name temporary-chatting-server"
-
-                  ssh -i ~/.ssh/deploy_key \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "ufw allow 80/tcp && ufw allow 3000/tcp && ufw reload"
-
-                  ssh -i ~/.ssh/deploy_key \
-                      ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "pm2 save"
+      - name: Deploy Application
+        run: |
+          REMOTE_DIR="/home/ubuntu/temporary-chatting"
+          
+          # 1. Clone/Update repository
+          echo "Updating repository..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "if [ -d '$REMOTE_DIR/.git' ]; then 
+                 cd '$REMOTE_DIR' && git stash && git pull origin main --no-rebase; 
+               else 
+                 git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git '$REMOTE_DIR'; 
+               fi"
+          
+          # 2. Deploy SERVER only (Node.js backend)
+          echo "Deploying server..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "cd '$REMOTE_DIR/server' && npm ci --only=production"
+          
+          echo "Starting server with PM2..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "cd '$REMOTE_DIR/server' && \
+               pm2 stop temporary-chatting-server 2>/dev/null || true && \
+               pm2 delete temporary-chatting-server 2>/dev/null || true && \
+               pm2 start server.js --name temporary-chatting-server"
+          
+          # 3. Build CLIENT (React frontend)
+          echo "Building client..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "cd '$REMOTE_DIR/client' && npm ci && npm run build"
+          
+          # 4. Configure server to serve static files from client/dist
+          echo "Configuring static file serving..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "if [ -d '$REMOTE_DIR/client/dist' ]; then
+                 echo '✓ Client built successfully';
+                 echo 'Static files are in: $REMOTE_DIR/client/dist';
+               else
+                 echo '✗ Client build failed or dist directory not found';
+                 ls -la '$REMOTE_DIR/client/';
+               fi"
+          
+          # 5. Remove any leftover PM2 process for "temporary-chatting-client"
+          echo "Cleaning up old PM2 processes..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "pm2 delete temporary-chatting-client 2>/dev/null || echo 'No client process to delete'"
+          
+          # 6. Save PM2 config and setup startup
+          echo "Configuring PM2..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "pm2 save && pm2 startup 2>/dev/null || true"
+          
+          # 7. Configure firewall if needed
+          echo "Checking firewall..."
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "sudo ufw allow 3000/tcp 2>/dev/null || true && \
+               sudo ufw --force enable 2>/dev/null || true"
+          
+          # 8. Show final status
+          echo "Deployment completed. PM2 status:"
+          ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "pm2 list && echo '\nServer logs:' && pm2 logs temporary-chatting-server --lines 5 2>/dev/null || true"
