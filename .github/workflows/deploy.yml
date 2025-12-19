@@ -41,7 +41,7 @@ jobs:
                   REMOTE_DIR="$HOME/temporary-chatting"
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "mkdir -p $REMOTE_DIR && (cd $REMOTE_DIR && git pull) || git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git $REMOTE_DIR"
+                      "sudo mkdir -p $REMOTE_DIR && (cd $REMOTE_DIR && git pull) || git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git $REMOTE_DIR"
 
                   # build by npm on server
                   ssh -i ~/.ssh/deploy_key \
