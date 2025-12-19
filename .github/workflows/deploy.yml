@@ -38,26 +38,27 @@ jobs:
             - name: Git clone to server
               run: |
                   # Clone the repository on the server
+                  REMOTE_DIR="$HOME/temporary-chatting"
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git /temporary-chatting || (cd /temporary-chatting && git pull)"
+                      "mkdir -p $REMOTE_DIR && (cd $REMOTE_DIR && git pull) || git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git $REMOTE_DIR"
 
                   # build by npm on server
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "cd /temporary-chatting/client && npm install && npm run build"
+                      "cd $REMOTE_DIR/client && npm install && npm run build"
 
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "pm2 stop all || true && pm2 start /temporary-chatting/client/dist/server.js --name temporary-chatting-client"
+                      "pm2 stop temporary-chatting-client || true && pm2 start $REMOTE_DIR/client/dist/server.js --name temporary-chatting-client"
 
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "cd /temporary-chatting/server && npm install && npm run build"
+                      "cd $REMOTE_DIR/server && npm install && npm run build"
 
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "pm2 stop all || true && pm2 start /temporary-chatting/server/dist/index.js --name temporary-chatting-server"
+                      "pm2 stop temporary-chatting-server || true && pm2 start $REMOTE_DIR/server/dist/index.js --name temporary-chatting-server"
 
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
