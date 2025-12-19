@@ -55,11 +55,11 @@ jobs:
 
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "cd $REMOTE_DIR/server && npm install && npm run build"
+                      "cd $REMOTE_DIR/server && npm install"
 
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "pm2 stop temporary-chatting-server || true && pm2 start $REMOTE_DIR/server/dist/index.js --name temporary-chatting-server"
+                      "pm2 stop temporary-chatting-server || true && pm2 start $REMOTE_DIR/server/server.js --name temporary-chatting-server"
 
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
