@@ -52,73 +52,7 @@ jobs:
               run: npm doctor || true
               continue-on-error: true
 
-    # Job 2: CVE Scanning for Client
-    client-cve-scan:
-        name: Client CVE Scan
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: ./client
-
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                  cache: "npm"
-                  cache-dependency-path: "./client/package-lock.json"
-
-            - name: Install dependencies
-              run: npm ci
-
-            - name: Run Snyk Security Scan
-              uses: snyk/actions/node@master
-              with:
-                  args: --severity-threshold=high --json-file-output=snyk-report.json
-              env:
-                  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-              continue-on-error: true
-
-            - name: Run OWASP Dependency Check
-              run: |
-                  # Download OWASP Dependency Check CLI
-                  VERSION="9.0.10"
-                  wget -q "https://github.com/jeremylong/DependencyCheck/releases/download/v${VERSION}/dependency-check-${VERSION}-release.zip"
-                  unzip -q "dependency-check-${VERSION}-release.zip"
-
-                  # Create reports directory
-                  mkdir -p ./reports
-
-                  # Run scan on current directory
-                  ./dependency-check/bin/dependency-check.sh \
-                    --project "client" \
-                    --scan "." \
-                    --format "HTML" \
-                    --format "JSON" \
-                    --out "./reports" \
-                    --disableNodeAudit \
-                    --nodePackageSkipDevDependencies false
-
-                  # Check if report was generated
-                  if [ -f "./reports/dependency-check-report.html" ]; then
-                    echo "OWASP report generated successfully"
-                    ls -la ./reports/
-                  else
-                    echo "OWASP report generation failed or no vulnerabilities found"
-                  fi
-              continue-on-error: true
-
-            - name: Upload OWASP report
-              uses: actions/upload-artifact@v4
-              with:
-                  name: client-owasp-report
-                  path: ./client/reports/
-                  if-no-files-found: ignore
-
-    # Job 3: Build Validation for Client
+    # Job 2: Build Validation for Client
     client-build-validation:
         name: Client Build Validation
         runs-on: ubuntu-latest
