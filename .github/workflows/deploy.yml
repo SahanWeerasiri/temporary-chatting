@@ -40,7 +40,7 @@ jobs:
                   # Clone the repository on the server
                   ssh -i ~/.ssh/deploy_key \
                       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                      "git clone -b main https://github.com/your-repo/your-project.git /tmp/your-project"
+                      "git clone -b main https://github.com/SahanWeerasiri/temporary-chatting.git ."
 
                   # build by npm on server
                   ssh -i ~/.ssh/deploy_key \
