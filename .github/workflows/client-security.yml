@@ -8,8 +8,6 @@ on:
     pull_request:
         paths:
             - "client/**"
-    schedule:
-        - cron: "0 10 * * 1" # Weekly on Monday at 10 AM
 
 jobs:
     # Job 1: Dependency Audit for Client

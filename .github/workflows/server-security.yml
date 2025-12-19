@@ -1,147 +1,145 @@
 name: Server Security Checks
 
 on:
-    push:
-        paths:
-            - "server/**"
-            - ".github/workflows/server-security.yml"
-    pull_request:
-        paths:
-            - "server/**"
-    schedule:
-        - cron: "0 11 * * 1"
+  push:
+    paths:
+      - "server/**"
+      - ".github/workflows/server-security.yml"
+  pull_request:
+    paths:
+      - "server/**"
 
 jobs:
-    server-dependency-audit:
-        name: Server Dependency Audit
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: ./server
+  server-dependency-audit:
+    name: Server Dependency Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                  cache: "npm"
-                  cache-dependency-path: "./server/package-lock.json"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "./server/package-lock.json"
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-            - name: Check outdated packages
-              run: npm outdated --long || true
-              continue-on-error: true
+      - name: Check outdated packages
+        run: npm outdated --long || true
+        continue-on-error: true
 
-            - name: Check deprecated packages
-              run: |
-                  echo "Checking for deprecated packages..."
-                  npm ls --depth=0 | grep "deprecated" || echo "No deprecated packages found"
-              continue-on-error: true
+      - name: Check deprecated packages
+        run: |
+          echo "Checking for deprecated packages..."
+          npm ls --depth=0 | grep "deprecated" || echo "No deprecated packages found"
+        continue-on-error: true
 
-            - name: Deep audit with detailed output
-              run: |
-                  npm audit --json > audit-report.json || true
-                  echo "Audit report saved to audit-report.json"
+      - name: Deep audit with detailed output
+        run: |
+          npm audit --json > audit-report.json || true
+          echo "Audit report saved to audit-report.json"
 
-                  # Extract critical issues
-                  if [ -f "audit-report.json" ]; then
-                    echo "=== Critical Vulnerabilities ==="
-                    grep -o '"severity":"critical"' audit-report.json | wc -l | xargs echo "Count:"
-                  fi
-              continue-on-error: true
+          # Extract critical issues
+          if [ -f "audit-report.json" ]; then
+            echo "=== Critical Vulnerabilities ==="
+            grep -o '"severity":"critical"' audit-report.json | wc -l | xargs echo "Count:"
+          fi
+        continue-on-error: true
 
-    server-build-validation:
-        name: Server Build and Runtime Validation
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: ./server
+  server-build-validation:
+    name: Server Build and Runtime Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                  cache: "npm"
-                  cache-dependency-path: "./server/package-lock.json"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "./server/package-lock.json"
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-            - name: Check for TypeScript compilation
-              run: |
-                  if [ -f "tsconfig.json" ]; then
-                    npx tsc --noEmit
-                    echo "✅ TypeScript compilation successful"
-                  else
-                    echo "ℹ️ No TypeScript configuration found"
-                  fi
-              continue-on-error: true
+      - name: Check for TypeScript compilation
+        run: |
+          if [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+            echo "✅ TypeScript compilation successful"
+          else
+            echo "ℹ️ No TypeScript configuration found"
+          fi
+        continue-on-error: true
 
-            - name: Run tests
-              run: |
-                  if [ -f "package.json" ] && npm run | grep -q "test"; then
-                    npm test -- --passWithNoTests
-                  else
-                    echo "ℹ️ No test script found"
-                  fi
-              continue-on-error: true
+      - name: Run tests
+        run: |
+          if [ -f "package.json" ] && npm run | grep -q "test"; then
+            npm test -- --passWithNoTests
+          else
+            echo "ℹ️ No test script found"
+          fi
+        continue-on-error: true
 
-            - name: Start server and check health
-              timeout-minutes: 2
-              run: |
-                  # Create a simple test script to check server health
-                  cat > test-server.js << 'EOF'
-                  const { spawn } = require('child_process');
-                  const http = require('http');
+      - name: Start server and check health
+        timeout-minutes: 2
+        run: |
+          # Create a simple test script to check server health
+          cat > test-server.js << 'EOF'
+          const { spawn } = require('child_process');
+          const http = require('http');
 
-                  // Start server
-                  const server = spawn('npm', ['run', 'start:dev'], { stdio: 'pipe' });
+          // Start server
+          const server = spawn('npm', ['run', 'start:dev'], { stdio: 'pipe' });
 
-                  // Wait for server to start
-                  setTimeout(() => {
-                    const options = {
-                      hostname: 'localhost',
-                      port: 3000,
-                      path: '/health',
-                      method: 'GET',
-                      timeout: 5000
-                    };
-                    
-                    const req = http.request(options, (res) => {
-                      console.log(`Health check status: ${res.statusCode}`);
-                      if (res.statusCode >= 200 && res.statusCode < 300) {
-                        console.log('✅ Server health check passed');
-                        process.exit(0);
-                      } else {
-                        console.log('❌ Server health check failed');
-                        process.exit(1);
-                      }
-                    });
-                    
-                    req.on('error', (err) => {
-                      console.log('❌ Server health check error:', err.message);
-                      process.exit(1);
-                    });
-                    
-                    req.end();
-                    
-                    // Kill server after check
-                    setTimeout(() => {
-                      server.kill();
-                    }, 1000);
-                    
-                  }, 10000); // Wait 10 seconds for server to start
-                  EOF
+          // Wait for server to start
+          setTimeout(() => {
+            const options = {
+              hostname: 'localhost',
+              port: 3000,
+              path: '/health',
+              method: 'GET',
+              timeout: 5000
+            };
+            
+            const req = http.request(options, (res) => {
+              console.log(`Health check status: ${res.statusCode}`);
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                console.log('✅ Server health check passed');
+                process.exit(0);
+              } else {
+                console.log('❌ Server health check failed');
+                process.exit(1);
+              }
+            });
+            
+            req.on('error', (err) => {
+              console.log('❌ Server health check error:', err.message);
+              process.exit(1);
+            });
+            
+            req.end();
+            
+            // Kill server after check
+            setTimeout(() => {
+              server.kill();
+            }, 1000);
+            
+          }, 10000); // Wait 10 seconds for server to start
+          EOF
 
-                  # Try to run the health check
-                  node test-server.js || echo "Health check completed with exit code: $?"
-              continue-on-error: true
+          # Try to run the health check
+          node test-server.js || echo "Health check completed with exit code: $?"
+        continue-on-error: true

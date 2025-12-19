@@ -13,22 +13,6 @@ on:
             - "deploy-scripts/**"
             - ".github/workflows/deploy.yml"
 
-    # Manual trigger from GitHub UI
-    workflow_dispatch:
-        inputs:
-            environment:
-                description: "Deploy environment"
-                required: true
-                default: "production"
-                type: choice
-                options:
-                    - staging
-                    - production
-            version:
-                description: "Deploy specific version/tag"
-                required: false
-                type: string
-
 jobs:
     deploy:
         name: Deploy to Server
