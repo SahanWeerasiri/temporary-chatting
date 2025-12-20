@@ -79,7 +79,7 @@ jobs:
           echo "🚀 Deploying server..."
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "cd $REMOTE_DIR && git stash && git pull origin main && cd server && npm ci --only=production && pm2 stop temporary-chatting-server 2>/dev/null || true && pm2 delete temporary-chatting-server 2>/dev/null || true && pm2 start server.js --name temporary-chatting-server"
+              "cd $REMOTE_DIR && git stash && git pull origin main --no-rebase && cd server && npm ci --only=production && pm2 stop temporary-chatting-server 2>/dev/null || true && pm2 delete temporary-chatting-server 2>/dev/null || true && pm2 start server.js --name temporary-chatting-server"
 
       - name: Deploy Client (Build Files)
         run: |
