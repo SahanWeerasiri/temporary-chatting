@@ -24,61 +24,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  # build-docker-images:
-  #   name: Build Docker Images
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
-
-  #     - name: Build Server Docker Image
-  #       uses: docker/build-push-action@v5
-  #       with:
-  #         context: ./server
-  #         file: ./server/Dockerfile
-  #         tags: temporary-chatting-server:latest
-  #         push: false # Don't push to registry, build locally on VM
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
-  #         outputs: type=docker,dest=/tmp/server.tar
-
-  #     - name: Build Client Docker Image
-  #       uses: docker/build-push-action@v5
-  #       with:
-  #         context: ./client
-  #         file: ./client/Dockerfile
-  #         tags: temporary-chatting-client:latest
-  #         push: false
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
-  #         outputs: type=docker,dest=/tmp/client.tar
-
-  #     - name: Upload Docker Images as Artifacts
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: docker-images
-  #         path: |
-  #           /tmp/server.tar
-  #           /tmp/client.tar
-  #         retention-days: 1
-
-  deploy-with-docker:
+  deploy:
     name: Deploy with Docker Compose
     runs-on: ubuntu-latest
-    # needs: [build-docker-images]
-    # if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
 
     steps:
-      # - name: Download Docker Images
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: docker-images
-      #     path: /tmp
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -86,84 +36,21 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
-      # - name: Copy Project Files to Server
-      #   run: |
-      #     echo "📦 Copying project files to server..."
-      #     # Create remote directory
-      #     ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-      #         ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-      #         "mkdir -p /home/ubuntu/temporary-chatting"
-
-      #     # Copy all necessary files
-      #     scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-      #       ./* ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/temporary-chatting/
-
-      # - name: Pull Existing Project Files
-      #   run: |
-      #     echo "🐳 Pulling existing project files..."
-      #     scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-      #       /tmp/server.tar /tmp/client.tar \
-      #       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
-
-      - name: Deploy Docker Containers
+      - name: Pull and Deploy
         run: |
-          REMOTE_DIR="/home/ubuntu/temporary-chatting"
-
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-
-          echo "🚀 Starting Docker deployment..."
-
-          echo "🚀 Starting containers..."
-          cd $REMOTE_DIR && git pull origin main --no-rebase && docker-compose up -d --build
-
-          # Wait for services to start
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          
+          cd /home/ubuntu/temporary-chatting && git pull origin main --no-rebase && docker-compose up -d --build
+          
           echo "⏳ Waiting for services to start..."
-          sleep 10
-
-          # Check container status
+          sleep 5
+          
+          echo "✅ Deployment complete!"
           echo "📊 Container status:"
           docker-compose ps
-
-          # Check logs
-          echo "📝 Recent logs:"
-          docker-compose logs --tail=20
-
-          # # Clean up old images
-          # echo "🧹 Cleaning up old images..."
-          # docker system prune -f --filter "until=24h"
-
-          # # Remove temporary files
-          # rm -f /tmp/server.tar /tmp/client.tar
-
-          echo "✅ Docker deployment complete!"
-
+          
           EOF
-
-      # - name: Verify Deployment
-      #   run: |
-      #     REMOTE_DIR="/home/ubuntu/temporary-chatting"
-
-      #     echo "📊 Deployment Verification:"
-      #     ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-      #         ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-
-      #     echo "1. Docker Container Status:"
-      #     docker-compose -f $REMOTE_DIR/docker-compose.yml ps
-
-      #     echo -e "\n2. Server Health Check (Port 5000):"
-      #     curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:5000/api/auth || echo "Server API not responding"
-
-      #     echo -e "\n3. Client Health Check (Port 80):"
-      #     curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost || echo "Client not responding"
-
-      #     echo -e "\n4. System Resources:"
-      #     docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | head -5
-
-      #     echo -e "\n5. Recent Logs:"
-      #     docker-compose -f $REMOTE_DIR/docker-compose.yml logs --tail=5
-
-      #     EOF
 
       - name: Cleanup SSH Key
         if: always()
