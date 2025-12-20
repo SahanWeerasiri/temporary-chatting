@@ -116,8 +116,7 @@ jobs:
 
           # Load Docker images
           echo "📥 Loading Docker images..."
-          docker load -i /tmp/server.tar
-          docker load -i /tmp/client.tar
+          docker load -i /tmp/server.tar && docker load -i /tmp/client.tar
 
           # Create necessary directories
           echo "📁 Creating data directories..."
@@ -129,8 +128,7 @@ jobs:
 
           # Start new containers
           echo "🚀 Starting new containers..."
-          cd $REMOTE_DIR
-          docker-compose up -d --build
+          cd $REMOTE_DIR && docker-compose up -d --build
 
           # Wait for services to start
           echo "⏳ Waiting for services to start..."
