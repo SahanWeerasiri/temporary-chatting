@@ -115,7 +115,7 @@ jobs:
           echo "🚀 Starting Docker deployment..."
 
           echo "🚀 Starting containers..."
-          cd $REMOTE_DIR && git pull origin main && docker-compose up -d --build
+          cd $REMOTE_DIR && git pull origin main --no-rebase && docker-compose up -d --build
 
           # Wait for services to start
           echo "⏳ Waiting for services to start..."
@@ -129,41 +129,41 @@ jobs:
           echo "📝 Recent logs:"
           docker-compose logs --tail=20
 
-          # Clean up old images
-          echo "🧹 Cleaning up old images..."
-          docker system prune -f --filter "until=24h"
+          # # Clean up old images
+          # echo "🧹 Cleaning up old images..."
+          # docker system prune -f --filter "until=24h"
 
-          # Remove temporary files
-          rm -f /tmp/server.tar /tmp/client.tar
+          # # Remove temporary files
+          # rm -f /tmp/server.tar /tmp/client.tar
 
           echo "✅ Docker deployment complete!"
 
           EOF
 
-      - name: Verify Deployment
-        run: |
-          REMOTE_DIR="/home/ubuntu/temporary-chatting"
+      # - name: Verify Deployment
+      #   run: |
+      #     REMOTE_DIR="/home/ubuntu/temporary-chatting"
 
-          echo "📊 Deployment Verification:"
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+      #     echo "📊 Deployment Verification:"
+      #     ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+      #         ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
 
-          echo "1. Docker Container Status:"
-          docker-compose -f $REMOTE_DIR/docker-compose.yml ps
+      #     echo "1. Docker Container Status:"
+      #     docker-compose -f $REMOTE_DIR/docker-compose.yml ps
 
-          echo -e "\n2. Server Health Check (Port 5000):"
-          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:5000/api/auth || echo "Server API not responding"
+      #     echo -e "\n2. Server Health Check (Port 5000):"
+      #     curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:5000/api/auth || echo "Server API not responding"
 
-          echo -e "\n3. Client Health Check (Port 80):"
-          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost || echo "Client not responding"
+      #     echo -e "\n3. Client Health Check (Port 80):"
+      #     curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost || echo "Client not responding"
 
-          echo -e "\n4. System Resources:"
-          docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | head -5
+      #     echo -e "\n4. System Resources:"
+      #     docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | head -5
 
-          echo -e "\n5. Recent Logs:"
-          docker-compose -f $REMOTE_DIR/docker-compose.yml logs --tail=5
+      #     echo -e "\n5. Recent Logs:"
+      #     docker-compose -f $REMOTE_DIR/docker-compose.yml logs --tail=5
 
-          EOF
+      #     EOF
 
       - name: Cleanup SSH Key
         if: always()
