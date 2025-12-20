@@ -86,16 +86,10 @@ jobs:
           mkdir -p $REMOTE_DIR
           cd $REMOTE_DIR
           
-          # Clone or pull server code
-          if [ -d ".git" ]; then
-            echo "Updating existing repository..."
-            git stash
-            git pull origin main
-          else
-            echo "Cloning fresh repository..."
-            git clone -b main --single-branch --depth 1 \
-                      https://github.com/SahanWeerasiri/temporary-chatting.git .
-          fi
+          # Pull server code
+          echo "Updating existing repository..."
+          git stash
+          git pull origin main
           
           # Install server dependencies
           echo "Installing server dependencies..."
