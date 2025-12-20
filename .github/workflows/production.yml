@@ -1,4 +1,4 @@
-name: Deploy to Production Real
+name: Deploy to Production (Docker)
 
 on:
   pull_request:
@@ -9,53 +9,75 @@ on:
     paths:
       - "server/**"
       - "client/**"
+      - "docker-compose.yml"
+      - "**/Dockerfile"
+      - ".github/workflows/production.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "client/**"
+      - "docker-compose.yml"
+      - "**/Dockerfile"
       - ".github/workflows/production.yml"
   workflow_dispatch:
 
 jobs:
-  build-client:
-    name: Build Client
+  build-docker-images:
+    name: Build Docker Images
     runs-on: ubuntu-latest
-    
-    defaults:
-      run:
-        working-directory: ./client
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Server Docker Image
+        uses: docker/build-push-action@v5
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: "./client/package-lock.json"
+          context: ./server
+          file: ./server/Dockerfile
+          tags: temporary-chatting-server:latest
+          push: false # Don't push to registry, build locally on VM
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/server.tar
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Build Client Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          tags: temporary-chatting-client:latest
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/client.tar
 
-      - name: Run build
-        run: npm run build
-
-      - name: Upload client build artifact
+      - name: Upload Docker Images as Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: client-build
-          path: ./client/build/
+          name: docker-images
+          path: |
+            /tmp/server.tar
+            /tmp/client.tar
           retention-days: 1
 
-  deploy:
-    name: Deploy to Server
+  deploy-with-docker:
+    name: Deploy with Docker Compose
     runs-on: ubuntu-latest
-    needs: [build-client]
-    
+    needs: [build-docker-images]
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+
     steps:
-      - name: Download client build artifact
+      - name: Download Docker Images
         uses: actions/download-artifact@v4
         with:
-          name: client-build
-          path: ./client-build
+          name: docker-images
+          path: /tmp
 
       - name: Setup SSH
         run: |
@@ -64,77 +86,99 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Open Firewall Port
+      - name: Copy Project Files to Server
         run: |
-          REMOTE_DIR="/home/ubuntu/temporary-chatting"
-          
-          echo "🔓 Opening firewall port 3000..."
+          echo "📦 Copying project files to server..."
+          # Create remote directory
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "sudo ufw allow 3000/tcp 2>/dev/null || echo 'Firewall already configured'"
+              "mkdir -p /home/ubuntu/temporary-chatting"
 
-      - name: Deploy Server (Node.js)
-        run: |
-          REMOTE_DIR="/home/ubuntu/temporary-chatting"
-          
-          echo "🚀 Deploying server..."
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "cd $REMOTE_DIR && git stash && git pull origin main --no-rebase && cd server && npm ci --only=production && pm2 stop temporary-chatting-server 2>/dev/null || true && pm2 delete temporary-chatting-server 2>/dev/null || true && pm2 start server.js --name temporary-chatting-server"
-
-      - name: Deploy Client (Build Files)
-        run: |
-          REMOTE_DIR="/home/ubuntu/temporary-chatting"
-          
-          echo "🚀 Deploying client build files..."
-          
-          # Create client build directory on server
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "mkdir -p $REMOTE_DIR/client/build"
-          
-          # Copy build files using scp
+          # Copy all necessary files
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-              ./client-build/* \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:$REMOTE_DIR/client/build/
-          
-          echo "✅ Client build files deployed"
+            ./* ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/temporary-chatting/
 
-      - name: Configure Static File Serving
+      - name: Copy Docker Images to Server
+        run: |
+          echo "🐳 Copying Docker images to server..."
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            /tmp/server.tar /tmp/client.tar \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
+
+      - name: Deploy Docker Containers
         run: |
           REMOTE_DIR="/home/ubuntu/temporary-chatting"
-          
-          echo "🔧 Configuring static file serving..."
+
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "cd $REMOTE_DIR/server && cat > server.js << 'EOF'
-          const express = require('express');
-          const path = require('path');
-          const app = express();
-          const PORT = 5000;
-          
-          // Serve static files from client/build
-          app.use(express.static(path.join(__dirname, '../client/build')));
-          
-          // Handle React routing, return all requests to React app
-          app.get('*', (req, res) => {
-            res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-          });
-          
-          app.listen(PORT, '0.0.0.0', () => {
-            console.log(\`Server is running on port \${PORT}\`);
-          });
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+
+          echo "🚀 Starting Docker deployment..."
+
+          # Load Docker images
+          echo "📥 Loading Docker images..."
+          docker load -i /tmp/server.tar
+          docker load -i /tmp/client.tar
+
+          # Create necessary directories
+          echo "📁 Creating data directories..."
+          mkdir -p $REMOTE_DIR/server/src/data/chats
+
+          # Stop and remove old containers
+          echo "🔄 Stopping old containers..."
+          docker-compose -f $REMOTE_DIR/docker-compose.yml down --remove-orphans 2>/dev/null || true
+
+          # Start new containers
+          echo "🚀 Starting new containers..."
+          cd $REMOTE_DIR
+          docker-compose up -d --build
+
+          # Wait for services to start
+          echo "⏳ Waiting for services to start..."
+          sleep 10
+
+          # Check container status
+          echo "📊 Container status:"
+          docker-compose ps
+
+          # Check logs
+          echo "📝 Recent logs:"
+          docker-compose logs --tail=20
+
+          # Clean up old images
+          echo "🧹 Cleaning up old images..."
+          docker system prune -f --filter "until=24h"
+
+          # Remove temporary files
+          rm -f /tmp/server.tar /tmp/client.tar
+
+          echo "✅ Docker deployment complete!"
+
           EOF
-          pm2 restart temporary-chatting-server && pm2 save"
 
       - name: Verify Deployment
         run: |
           REMOTE_DIR="/home/ubuntu/temporary-chatting"
-          
+
           echo "📊 Deployment Verification:"
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "echo '1. PM2 Status:' && pm2 list | grep temporary-chatting-server && echo '' && echo '2. Client Build Files:' && ls -la $REMOTE_DIR/client/build/ && echo '' && echo '3. Server Process:' && pgrep -f 'node.*server.js' || echo 'Server process not found' && echo '' && echo '4. Disk Space:' && df -h $REMOTE_DIR && echo '' && echo '5. Server Test:' && curl -s -o /dev/null -w 'HTTP Status: %{http_code}' http://localhost:3000 || echo 'Server not responding'"
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+
+          echo "1. Docker Container Status:"
+          docker-compose -f $REMOTE_DIR/docker-compose.yml ps
+
+          echo -e "\n2. Server Health Check (Port 5000):"
+          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:5000/api/auth || echo "Server API not responding"
+
+          echo -e "\n3. Client Health Check (Port 80):"
+          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost || echo "Client not responding"
+
+          echo -e "\n4. System Resources:"
+          docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | head -5
+
+          echo -e "\n5. Recent Logs:"
+          docker-compose -f $REMOTE_DIR/docker-compose.yml logs --tail=5
+
+          EOF
 
       - name: Cleanup SSH Key
         if: always()
