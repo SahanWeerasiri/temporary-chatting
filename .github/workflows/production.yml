@@ -82,9 +82,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
           
-          cd $REMOTE_DIR
-          pwd
-          ls
+          cd $REMOTE_DIR/temporary-chatting
           
           # Pull server code
           echo "Updating existing repository..."
