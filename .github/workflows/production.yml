@@ -83,7 +83,6 @@ jobs:
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
           
           # Create directory if it doesn't exist
-          mkdir -p $REMOTE_DIR
           cd $REMOTE_DIR
           
           # Pull server code
