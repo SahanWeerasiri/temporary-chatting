@@ -72,6 +72,15 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Open Firewall Port
+        run: |
+          REMOTE_DIR="/home/ubuntu/temporary-chatting"
+          
+          echo "🔓 Opening firewall port 3000..."
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "sudo ufw allow 3000/tcp 2>/dev/null || echo 'Firewall already configured'"
+
       - name: Deploy Server (Node.js)
         run: |
           REMOTE_DIR="/home/ubuntu/temporary-chatting"
@@ -106,7 +115,7 @@ jobs:
           echo "🔧 Configuring static file serving..."
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "cd $REMOTE_DIR/server && cat > server.js << 'SERVER_JS'
+              "cd $REMOTE_DIR/server && cat > server.js << 'EOF'
           const express = require('express');
           const path = require('path');
           const app = express();
@@ -120,10 +129,11 @@ jobs:
             res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
           });
           
-          app.listen(PORT, () => {
+          app.listen(PORT, '0.0.0.0', () => {
             console.log(\`Server is running on port \${PORT}\`);
           });
-          SERVER_JS && pm2 restart temporary-chatting-server && pm2 save"
+          EOF
+          pm2 restart temporary-chatting-server && pm2 save"
 
       - name: Verify Deployment
         run: |
