@@ -48,132 +48,167 @@ jobs:
     needs: [client-build-validation]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
+    permissions:
+      contents: write  # Required for pushing to branches
+    
     steps:
       - name: Debug - Starting deployment
         run: |
-          echo "🚀 Deployment triggered for: ${{ github.sha }}"
-          echo "Event: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "Should deploy? ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
+          echo "🚀 Deployment starting..."
+          echo "SHA: ${{ github.sha }}"
+          echo "Repository: ${{ github.repository }}"
       
-      - name: Checkout source code
+      - name: Checkout source code with token
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}  # This gives push access
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install dependencies and build
+      - name: Build client application
         run: |
           echo "📦 Installing dependencies..."
           cd client
-          npm ci
+          npm ci --silent 2>/dev/null || npm ci
           echo "🏗️ Building application..."
           npm run build
           echo "✅ Build completed"
+          ls -la build/
 
-      - name: Configure Git
+      - name: Configure Git identity
         run: |
           echo "⚙️ Configuring Git..."
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Prepare production branch
+      - name: Check if production branch exists
+        id: check-branch
         run: |
-          echo "🌿 Preparing production branch..."
-          
-          # List all branches
-          echo "Available branches:"
-          git branch -a
-          
-          # Check if production branch exists
-          if git ls-remote --exit-code --heads origin production; then
+          echo "🔍 Checking if production branch exists..."
+          if git ls-remote --exit-code --heads origin production > /dev/null 2>&1; then
             echo "✅ Production branch exists"
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "📭 Production branch does not exist"
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup production branch
+        run: |
+          echo "🌿 Setting up production branch..."
+          
+          if [ "${{ steps.check-branch.outputs.branch_exists }}" = "true" ]; then
+            echo "Fetching and checking out existing production branch..."
             git fetch origin production
             git checkout production
-            echo "Switched to production branch"
             
-            # Clean the directory (keep .git)
+            # Clean the directory completely
             echo "🧹 Cleaning directory..."
-            find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} + 2>/dev/null || true
+            # Remove everything except .git
+            find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} + 2>/dev/null || echo "Cleanup completed"
           else
-            echo "🆕 Creating new production branch..."
+            echo "Creating new orphan production branch..."
             git checkout --orphan production
-            # Remove all files in the new branch
+            # Initial commit for orphan branch
             git rm -rf . 2>/dev/null || true
           fi
+          
+          echo "Current branch: $(git branch --show-current)"
 
-      - name: Verify build output
-        run: |
-          echo "🔍 Verifying build output..."
-          ls -la client/build/
-          if [ ! -f "client/build/index.html" ]; then
-            echo "❌ ERROR: index.html not found in build!"
-            exit 1
-          fi
-          echo "✅ Build verified"
-
-      - name: Copy build files
+      - name: Copy build files to root
         run: |
           echo "📋 Copying build files..."
           
+          # Make sure build directory exists
+          if [ ! -d "client/build" ]; then
+            echo "❌ ERROR: client/build directory not found!"
+            exit 1
+          fi
+          
           # List what we're copying
-          echo "Build directory contents:"
+          echo "Source directory contents:"
           ls -la client/build/
           
-          # Copy all build files
-          cp -r client/build/* . 2>/dev/null || echo "⚠️ Some warnings during copy"
+          # Copy files (preserve hidden files like .nojekyll)
+          shopt -s dotglob
+          cp -r client/build/* . 2>/dev/null || echo "Copy completed with some warnings"
           
-          # Verify copied files
-          echo "Copied files:"
-          ls -la
-          
-          # Create README
-          cat > README.md << EOF
+          # Create/update README
+          cat > README.md << 'EOF'
           # Production Build
           
           This branch contains the production build of the client application.
-          Built on: $(date)
-          Commit: ${{ github.sha }}
           
-          Do not edit files in this branch directly.
+          - Built from: ${{ github.sha }}
+          - Built on: $(date -u)
+          - Workflow: ${{ github.workflow }}
+          
+          ⚠️ Do not edit files in this branch directly.
           All changes should be made in the main branch.
           EOF
           
+          # Create .nojekyll for GitHub Pages if needed
           touch .nojekyll
+          
           echo "✅ Files copied successfully"
+          echo "Destination directory contents:"
+          ls -la
 
-      - name: Commit and push
+      - name: Commit changes
+        id: commit
         run: |
-          echo "💾 Committing changes..."
+          echo "💾 Preparing commit..."
           
           # Show git status
-          git status
+          echo "Git status:"
+          git status --short
           
           # Add all files
           git add -A
           
           # Check if there are changes
-          if git diff --cached --quiet; then
-            echo "⚠️ No changes to commit"
-          else
-            echo "Changes to commit:"
+          if ! git diff --cached --quiet; then
+            echo "Changes to be committed:"
             git diff --cached --name-only
             
-            # Commit and push
-            git commit -m "Deploy production build from ${{ github.sha }}"
-            echo "🚀 Pushing to production branch..."
-            git push origin production
-            echo "✅ Successfully deployed to production branch!"
-            
-            # Show the commit
-            git log --oneline -1
+            # Create commit
+            git commit -m "🚀 Deploy production build from ${{ github.sha }}"
+            echo "✅ Changes committed"
+            echo "committed=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ No changes to commit"
+            echo "committed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Final success message
-        run: echo "🎉 Deployment workflow completed successfully!"
+      - name: Push to production branch
+        if: steps.commit.outputs.committed == 'true'
+        run: |
+          echo "🚀 Pushing to production branch..."
+          
+          # Show what we're pushing
+          echo "Commit to push:"
+          git log --oneline -1
+          
+          # Push to production branch
+          git push origin production
+          
+          echo "✅ Successfully deployed to production branch!"
+          echo "🌐 Branch URL: https://github.com/${{ github.repository }}/tree/production"
+
+      - name: Skip push (no changes)
+        if: steps.commit.outputs.committed == 'false'
+        run: |
+          echo "⏭️ Skipping push - no changes to deploy"
+
+      - name: Deployment summary
+        run: |
+          echo "🎉 Deployment workflow completed!"
+          echo "Summary:"
+          echo "- Event: ${{ github.event_name }}"
+          echo "- Source: ${{ github.ref }}"
+          echo "- Target: production branch"
+          echo "- Status: ${{ steps.commit.outputs.committed == 'true' && 'Deployed' || 'No changes' }}"
