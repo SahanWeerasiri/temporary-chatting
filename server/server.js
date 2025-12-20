@@ -8,7 +8,7 @@ const userRoutes = require('./src/routes/users');
 const chatRoutes = require('./src/routes/chats');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = 5000;
 
 // Middleware
 app.use(cors());

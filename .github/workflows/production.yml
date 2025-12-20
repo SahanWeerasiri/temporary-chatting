@@ -24,60 +24,60 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-docker-images:
-    name: Build Docker Images
-    runs-on: ubuntu-latest
+  # build-docker-images:
+  #   name: Build Docker Images
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Build Server Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./server
-          file: ./server/Dockerfile
-          tags: temporary-chatting-server:latest
-          push: false # Don't push to registry, build locally on VM
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          outputs: type=docker,dest=/tmp/server.tar
+  #     - name: Build Server Docker Image
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         context: ./server
+  #         file: ./server/Dockerfile
+  #         tags: temporary-chatting-server:latest
+  #         push: false # Don't push to registry, build locally on VM
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
+  #         outputs: type=docker,dest=/tmp/server.tar
 
-      - name: Build Client Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./client
-          file: ./client/Dockerfile
-          tags: temporary-chatting-client:latest
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          outputs: type=docker,dest=/tmp/client.tar
+  #     - name: Build Client Docker Image
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         context: ./client
+  #         file: ./client/Dockerfile
+  #         tags: temporary-chatting-client:latest
+  #         push: false
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
+  #         outputs: type=docker,dest=/tmp/client.tar
 
-      - name: Upload Docker Images as Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-images
-          path: |
-            /tmp/server.tar
-            /tmp/client.tar
-          retention-days: 1
+  #     - name: Upload Docker Images as Artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: docker-images
+  #         path: |
+  #           /tmp/server.tar
+  #           /tmp/client.tar
+  #         retention-days: 1
 
   deploy-with-docker:
     name: Deploy with Docker Compose
     runs-on: ubuntu-latest
-    needs: [build-docker-images]
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    # needs: [build-docker-images]
+    # if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
 
     steps:
-      - name: Download Docker Images
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-images
-          path: /tmp
+      # - name: Download Docker Images
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: docker-images
+      #     path: /tmp
 
       - name: Setup SSH
         run: |
@@ -86,24 +86,24 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Copy Project Files to Server
-        run: |
-          echo "📦 Copying project files to server..."
-          # Create remote directory
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "mkdir -p /home/ubuntu/temporary-chatting"
+      # - name: Copy Project Files to Server
+      #   run: |
+      #     echo "📦 Copying project files to server..."
+      #     # Create remote directory
+      #     ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+      #         ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+      #         "mkdir -p /home/ubuntu/temporary-chatting"
 
-          # Copy all necessary files
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            ./* ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/temporary-chatting/
+      #     # Copy all necessary files
+      #     scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+      #       ./* ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/temporary-chatting/
 
-      - name: Copy Docker Images to Server
-        run: |
-          echo "🐳 Copying Docker images to server..."
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            /tmp/server.tar /tmp/client.tar \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
+      # - name: Pull Existing Project Files
+      #   run: |
+      #     echo "🐳 Pulling existing project files..."
+      #     scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+      #       /tmp/server.tar /tmp/client.tar \
+      #       ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
 
       - name: Deploy Docker Containers
         run: |
@@ -114,21 +114,8 @@ jobs:
 
           echo "🚀 Starting Docker deployment..."
 
-          # Load Docker images
-          echo "📥 Loading Docker images..."
-          docker load -i /tmp/server.tar && docker load -i /tmp/client.tar
-
-          # Create necessary directories
-          echo "📁 Creating data directories..."
-          mkdir -p $REMOTE_DIR/server/src/data/chats
-
-          # Stop and remove old containers
-          echo "🔄 Stopping old containers..."
-          docker-compose -f $REMOTE_DIR/docker-compose.yml down --remove-orphans 2>/dev/null || true
-
-          # Start new containers
-          echo "🚀 Starting new containers..."
-          cd $REMOTE_DIR && docker-compose up -d --build
+          echo "🚀 Starting containers..."
+          cd $REMOTE_DIR && git pull origin main && docker-compose up -d --build
 
           # Wait for services to start
           echo "⏳ Waiting for services to start..."
