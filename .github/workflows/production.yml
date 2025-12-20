@@ -1,17 +1,17 @@
 name: Deploy to Production (Docker)
 
 on:
-  pull_request:
-    types:
-      - closed
-    branches:
-      - main
-    paths:
-      - "server/**"
-      - "client/**"
-      - "docker-compose.yml"
-      - "**/Dockerfile"
-      - ".github/workflows/production.yml"
+  # pull_request:
+  #   types:
+  #     - closed
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "server/**"
+  #     - "client/**"
+  #     - "docker-compose.yml"
+  #     - "**/Dockerfile"
+  #     - ".github/workflows/production.yml"
   push:
     branches:
       - main
