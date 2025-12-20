@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "client/**"
+  workflow_dispatch:
 
 jobs:
   # Job 1: Dependency Audit for Client
