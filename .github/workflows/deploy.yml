@@ -1,15 +1,6 @@
 name: Deploy to Production
 
 on:
-  pull_request:
-    types:
-      - closed
-    branches:
-      - main
-    paths:
-      - "server/**"
-      - "client/**"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 jobs:
