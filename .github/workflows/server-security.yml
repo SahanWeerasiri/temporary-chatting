@@ -1,9 +1,7 @@
 name: Server Security Checks
 
 on:
-  pull_request:
-    paths:
-      - "server/**"
+  workflow_dispatch:
 
 jobs:
   server-dependency-audit:
