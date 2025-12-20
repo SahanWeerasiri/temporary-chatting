@@ -9,21 +9,21 @@ on:
     paths:
       - "server/**"
       - "client/**"
-      - ".github/workflows/deploy.yml"
+      - ".github/workflows/production.yml"
   push:
     branches:
       - main
     paths:
       - "server/**"
       - "client/**"
-      - ".github/workflows/deploy.yml"
+      - ".github/workflows/production.yml"
   workflow_dispatch:
 
 jobs:
   build-client:
     name: Build Client
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    # if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
     
     defaults:
       run:
