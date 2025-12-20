@@ -10,7 +10,7 @@ const chatRoutes = require('./src/routes/chats');
 const app = express();
 const PORT = 5000;
 
-// Middleware
+// Middleware 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
