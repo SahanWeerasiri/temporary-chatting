@@ -1,0 +1,203 @@
+name: Deploy to Production
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "client/**"
+      - ".github/workflows/deploy.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "client/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  build-client:
+    name: Build Client
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    
+    defaults:
+      run:
+        working-directory: ./client
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "./client/package-lock.json"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run build
+        run: npm run build
+
+      - name: Upload client build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-build
+          path: ./client/build/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    needs: [build-client]
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    
+    steps:
+      - name: Download client build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: client-build
+          path: ./client-build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Server (Node.js)
+        run: |
+          REMOTE_DIR="/home/ubuntu/temporary-chatting"
+          
+          # 1. Clone/Update repository (server code only)
+          echo "🚀 Deploying server..."
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          
+          # Create directory if it doesn't exist
+          mkdir -p $REMOTE_DIR
+          cd $REMOTE_DIR
+          
+          # Clone or pull server code
+          if [ -d ".git" ]; then
+            echo "Updating existing repository..."
+            git stash
+            git pull origin main
+          else
+            echo "Cloning fresh repository..."
+            git clone -b main --single-branch --depth 1 \
+                      https://github.com/SahanWeerasiri/temporary-chatting.git .
+          fi
+          
+          # Install server dependencies
+          echo "Installing server dependencies..."
+          cd server
+          npm ci --only=production
+          
+          # Start server with PM2
+          echo "Starting server with PM2..."
+          pm2 stop temporary-chatting-server 2>/dev/null || true
+          pm2 delete temporary-chatting-server 2>/dev/null || true
+          pm2 start server.js --name temporary-chatting-server
+          
+          EOF
+
+      - name: Deploy Client (Build Files)
+        run: |
+          REMOTE_DIR="/home/ubuntu/temporary-chatting"
+          
+          echo "🚀 Deploying client build files..."
+          
+          # Create client build directory on server
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "mkdir -p $REMOTE_DIR/client/build"
+          
+          # Copy build files using scp
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+              ./client-build/* \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:$REMOTE_DIR/client/build/
+          
+          echo "✅ Client build files deployed"
+
+      - name: Configure Static File Serving
+        run: |
+          REMOTE_DIR="/home/ubuntu/temporary-chatting"
+          
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          
+          echo "🔧 Configuring static file serving..."
+          
+          # Update server.js to serve static files from client/build (not dist)
+          cat > $REMOTE_DIR/server/server.js << 'SERVER_JS'
+          const express = require('express');
+          const path = require('path');
+          const app = express();
+          const PORT = process.env.PORT || 3000;
+          
+          // Serve static files from client/build
+          app.use(express.static(path.join(__dirname, '../client/build')));
+          
+          // Handle React routing, return all requests to React app
+          app.get('*', (req, res) => {
+            res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+          });
+          
+          app.listen(PORT, () => {
+            console.log(\`Server is running on port \${PORT}\`);
+          });
+          SERVER_JS
+          
+          # Restart server to apply changes
+          pm2 restart temporary-chatting-server
+          
+          # Save PM2 configuration
+          pm2 save
+          
+          echo "✅ Static file serving configured"
+          EOF
+
+      - name: Verify Deployment
+        run: |
+          REMOTE_DIR="/home/ubuntu/temporary-chatting"
+          
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          
+          echo "📊 Deployment Verification:"
+          echo "=========================="
+          
+          # Check server status
+          echo "1. PM2 Status:"
+          pm2 list | grep temporary-chatting-server
+          
+          # Check if build files exist
+          echo -e "\n2. Client Build Files:"
+          ls -la $REMOTE_DIR/client/build/
+          
+          # Check server is serving files
+          echo -e "\n3. Server Process:"
+          pgrep -f "node.*server.js" || echo "Server process not found"
+          
+          # Check disk space
+          echo -e "\n4. Disk Space:"
+          df -h $REMOTE_DIR
+          
+          # Optional: Quick curl test (if server is accessible)
+          echo -e "\n5. Server Test (if accessible):"
+          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:3000 || echo "Server not responding"
+          
+          EOF
+
+      - name: Cleanup SSH Key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
