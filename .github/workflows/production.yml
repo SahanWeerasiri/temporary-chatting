@@ -10,13 +10,6 @@ on:
       - "server/**"
       - "client/**"
       - ".github/workflows/production.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "server/**"
-      - "client/**"
-      - ".github/workflows/production.yml"
   workflow_dispatch:
 
 jobs:
