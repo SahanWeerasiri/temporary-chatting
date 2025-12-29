@@ -40,17 +40,34 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-          
+
           cd /home/ubuntu/temporary-chatting && git pull origin main --no-rebase && docker-compose up -d --build
-          
+
           echo "⏳ Waiting for services to start..."
           sleep 5
-          
+
           echo "✅ Deployment complete!"
           echo "📊 Container status:"
           docker-compose ps
-          
+
           EOF
+
+      - name: Process Deployment Logs
+        id: process-logs
+        uses: ./.github/workflows/process-logs
+        if: always() # Run even if previous steps fail
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # run-id is optional, defaults to current run
+
+      - name: Display Combined Logs
+        if: always()
+        run: |
+          echo "📋 Combined Logs from Deployment:"
+          echo "=================================="
+          cat ${{ steps.process-logs.outputs.logs-path }}
+          echo ""
+          echo "🔗 View full logs: ${{ steps.process-logs.outputs.log-url }}"
 
       - name: Cleanup SSH Key
         if: always()
