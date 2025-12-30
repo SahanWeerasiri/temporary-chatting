@@ -4,7 +4,7 @@ inputs:
     github-token:
         description: "GitHub token"
         required: true
-        default: ${{ secrets.TOKEN }}
+        default: ${{ github.token }} # Correct context
     run-id:
         description: "Workflow run ID (defaults to current run)"
         required: false
@@ -15,4 +15,4 @@ outputs:
         description: "URL to logs in GitHub UI"
 runs:
     using: "node20"
-    main: "dist/index.js" # Changed from index.js to dist/index.js
+    main: "dist/index.js"
