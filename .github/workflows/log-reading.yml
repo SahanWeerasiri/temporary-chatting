@@ -1,44 +1,45 @@
 name: Log Reading
 
 on:
-    workflow_dispatch:
-    push:
-        branches: [main]
+  workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
-    client-build-validation:
-        name: Client Build Validation
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: ./client
+  client-build-validation:
+    name: Client Build Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Register with log server
-              uses: ./.github/actions/monitor
-              with:
-                  token: ${{ github.token }}
+      - name: Register with log server
+        uses: ./.github/actions/monitor
+        with:
+          token: ${{ github.token }}
+          run_id: ${{ steps.get-run-id.outputs.run_id }}
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                  cache: "npm"
-                  cache-dependency-path: "./client/package-lock.json"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "./client/package-lock.json"
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-            - name: Run build
-              run: npm run build
+      - name: Run build
+        run: npm run build
 
-            - name: Upload build artifacts
-              if: success()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: client-build
-                  path: ./client/build/
-                  retention-days: 7
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-build
+          path: ./client/build/
+          retention-days: 7
