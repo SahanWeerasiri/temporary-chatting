@@ -11,7 +11,7 @@ inputs:
     required: false
     default: '10'
   github-token:
-    description: 'GitHub token (use secrets.TOKEN)'
+    description: 'GitHub token'
     required: true
     default: ''
 
@@ -34,7 +34,6 @@ runs:
         
         if [ -z "$GITHUB_TOKEN" ]; then
           echo "❌ ERROR: GitHub token is required!"
-          echo "   Pass it as: github-token: \${{ secrets.TOKEN }}"
           exit 1
         fi
         
