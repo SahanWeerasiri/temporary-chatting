@@ -1,5 +1,5 @@
-name: 'GitHub Log Fetcher'
-description: 'Send runner info to server for log collection'
+name: 'Workflow Log Monitor'
+description: 'Register workflow with log monitoring server'
 inputs:
   server-url:
     description: 'URL of the log monitoring server'
@@ -9,34 +9,37 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Send runner info to log server
+    - name: Register workflow with log server
       shell: bash
       run: |
         RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
         SERVER_URL="${{ inputs.server-url }}"
         
-        echo "🚀 Sending runner info to log server..."
+        echo "🚀 Registering workflow with log server..."
         echo "📋 Runner ID: ${RUNNER_ID}"
-        echo "🌐 Server: ${SERVER_URL}"
         echo "🏷 Repository: ${{ github.repository }}"
+        echo "🔧 Workflow: ${{ github.workflow }}"
+        echo "💼 Job: ${{ github.job }}"
         
-        # Send runner info to server
+        # Send workflow info to server
         RESPONSE=$(curl -s -X POST \
           -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ github.token }}" \
           -d "{
-            \"runnerId\": \"${RUNNER_ID}\",
-            \"token\": \"${{ github.token }}\",
+            \"repository\": \"${{ github.repository }}\",
             \"workflow\": \"${{ github.workflow }}\",
             \"job\": \"${{ github.job }}\",
-            \"repository\": \"${{ github.repository }}\",
-            \"status\": \"started\",
             \"timestamp\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
           }" \
           "${SERVER_URL}/${RUNNER_ID}")
         
         echo "📨 Server response: ${RESPONSE}"
         
-        # Export runner ID for reference
+        # Export runner ID
         echo "RUNNER_ID=${RUNNER_ID}" >> $GITHUB_ENV
         echo "LOG_SERVER=${SERVER_URL}" >> $GITHUB_ENV
+        
+        echo ""
+        echo "📋 Next steps to fetch logs:"
+        echo "1. Wait for workflow to complete"
+        echo "2. Check status: curl ${SERVER_URL}/${RUNNER_ID}/status"
+        echo "3. Fetch logs manually: curl -X POST ${SERVER_URL}/${RUNNER_ID}/fetch -H 'Content-Type: application/json' -d '{\"token\": \"YOUR_GITHUB_TOKEN\"}'"
