@@ -2,9 +2,9 @@
     "name": "log-processor",
     "version": "1.0.0",
     "description": "GitHub Action to process and analyze logs",
-    "main": "index.js",
+    "main": "dist/index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "build": "ncc build index.js --license licenses.txt"
     },
     "keywords": [],
     "author": "",
@@ -12,5 +12,8 @@
     "dependencies": {
         "@actions/core": "^1.10.0",
         "@actions/github": "^5.1.1"
+    },
+    "devDependencies": {
+        "@vercel/ncc": "^0.38.0"
     }
 }
