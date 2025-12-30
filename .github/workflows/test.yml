@@ -43,7 +43,7 @@ jobs:
         # Cleanup
         rm -f test.txt
       env:
-        LOG_SERVER_URL: wss://129.154.46.198:8000
+        LOG_SERVER_URL: ws://129.154.46.198:8000
         AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
         GITHUB_RUN_ID: ${{ github.run_id }}
         GITHUB_JOB: ${{ github.job }}
