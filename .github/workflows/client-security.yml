@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0 # Fetch all history for proper versioning
       
       - name: Send logs to monitoring server
-        uses: ./.github/actions/log-monitor
+        uses: ./.github/actions/process-logs
         with:
           server-url: 'http://129.154.46.198:3000'
       
