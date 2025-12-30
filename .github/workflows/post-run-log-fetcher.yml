@@ -1,10 +1,11 @@
 name: Post-Run Log Fetcher
 
 on:
-    workflow_run:
-        workflows: ["Client Security Checks & Build"]
-        types:
-            - completed
+    workflow_dispatch:
+    # workflow_run:
+    #     workflows: ["Client Security Checks & Build"]
+    #     types:
+    #         - completed
 
 jobs:
     fetch-logs:
