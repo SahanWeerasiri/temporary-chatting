@@ -1,0 +1,32 @@
+name: Post-Run Log Fetcher
+
+on:
+    workflow_run:
+        workflows: ["Client Security Checks & Build"]
+        types:
+            - completed
+
+jobs:
+    fetch-logs:
+        name: Fetch Logs for Previous Run
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: read
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Fetch and Extract Logs for Previous Run
+              uses: ./.github/workflows/process-logs
+              with:
+                  run-id: ${{ github.event.workflow_run.id }}
+                  # github-token: ${{ secrets.TOKEN }}
+
+            - name: Display Combined Logs
+              run: |
+                  echo "📋 Combined Logs from Deployment:"
+                  echo "=================================="
+                  cat fetched-logs/combined-logs.txt || echo "No combined logs found."
+                  echo ""
+                  echo "🔗 View full logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"

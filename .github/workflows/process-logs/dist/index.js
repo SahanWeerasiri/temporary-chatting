@@ -1,112 +1,6 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 6136:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const core = __nccwpck_require__(7484);
-const github = __nccwpck_require__(3228);
-const fs = __nccwpck_require__(9896);
-const path = __nccwpck_require__(6928);
-const { execSync } = __nccwpck_require__(5317);
-
-async function run() {
-    try {
-        const token = core.getInput('github-token');
-        const specifiedRunId = core.getInput('run-id');
-
-        const octokit = github.getOctokit(token);
-        const context = github.context;
-
-        const runId = specifiedRunId || context.runId;
-
-        // Get owner and repo from context
-        const owner = context.repo.owner;
-        const repo = context.repo.repo;
-
-        console.log(`🔍 Fetching logs for run: ${runId}`);
-        console.log(`📁 Repository: ${owner}/${repo}`);
-
-        // Get logs archive
-        const { data: logBuffer } = await octokit.rest.actions.downloadWorkflowRunLogs({
-            owner,
-            repo,
-            run_id: runId,
-        });
-
-        // Save the zip file
-        const outputDir = path.join(process.env.GITHUB_WORKSPACE || '.', 'fetched-logs');
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
-        }
-
-        const zipPath = path.join(outputDir, `run-${runId}-logs.zip`);
-        fs.writeFileSync(zipPath, Buffer.from(logBuffer));
-
-        // Extract the zip
-        execSync(`unzip -o "${zipPath}" -d "${outputDir}"`);
-
-        // Find log files
-        const logFiles = [];
-        function findLogFiles(dir) {
-            const files = fs.readdirSync(dir);
-            for (const file of files) {
-                const fullPath = path.join(dir, file);
-                const stat = fs.statSync(fullPath);
-                if (stat.isDirectory()) {
-                    findLogFiles(fullPath);
-                } else if (file.endsWith('.txt') || file === '0_Setup SSH.txt' || file === '1_Pull and Deploy.txt') {
-                    logFiles.push(fullPath);
-                }
-            }
-        }
-
-        findLogFiles(outputDir);
-
-        // Combine all logs
-        const combinedLogs = [];
-        for (const logFile of logFiles) {
-            try {
-                const content = fs.readFileSync(logFile, 'utf8');
-                const fileName = path.relative(outputDir, logFile);
-                combinedLogs.push(`=== ${fileName} ===`);
-                combinedLogs.push(content);
-                combinedLogs.push(''); // Empty line between files
-            } catch (error) {
-                console.warn(`⚠️ Could not read file ${logFile}: ${error.message}`);
-            }
-        }
-
-        const combinedPath = path.join(outputDir, 'combined-logs.txt');
-        fs.writeFileSync(combinedPath, combinedLogs.join('\n'));
-
-        // Set outputs
-        core.setOutput('logs-path', combinedPath);
-        core.setOutput('log-url', `https://github.com/${owner}/${repo}/actions/runs/${runId}`);
-
-        console.log(`✅ Logs saved to: ${combinedPath}`);
-        console.log(`📊 Total log files found: ${logFiles.length}`);
-        console.log(`🔗 View in browser: https://github.com/${owner}/${repo}/actions/runs/${runId}`);
-
-        // Return the combined logs content
-        return combinedLogs.join('\n');
-
-    } catch (error) {
-        core.setFailed(`Failed to fetch logs: ${error.message}`);
-        console.error('Full error details:', error);
-        throw error;
-    }
-}
-
-// Export for testing if needed
-if (require.main === require.cache[eval('__filename')]) {
-    run();
-}
-
-module.exports = { run };
-
-/***/ }),
-
 /***/ 4914:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -34593,12 +34487,84 @@ module.exports = /*#__PURE__*/JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
 /******/ 	
 /************************************************************************/
-/******/ 	
-/******/ 	// startup
-/******/ 	// Load entry module and return exports
-/******/ 	// This entry module is referenced by other modules so it can't be inlined
-/******/ 	var __webpack_exports__ = __nccwpck_require__(6136);
-/******/ 	module.exports = __webpack_exports__;
-/******/ 	
+var __webpack_exports__ = {};
+
+
+const core = __nccwpck_require__(7484);
+const github = __nccwpck_require__(3228);
+const fs = __nccwpck_require__(9896);
+const path = __nccwpck_require__(6928);
+const { execSync } = __nccwpck_require__(5317);
+
+async function run() {
+    try {
+        const token = core.getInput('github-token');
+        const specifiedRunId = core.getInput('run-id');
+        const octokit = github.getOctokit(token);
+        const context = github.context;
+        const runId = specifiedRunId || context.runId;
+        const owner = context.repo.owner;
+        const repo = context.repo.repo;
+
+        console.log(`🔍 Fetching logs for run: ${runId}`);
+        console.log(`📁 Repository: ${owner}/${repo}`);
+
+        // Fetch logs
+        const { data: logBuffer } = await octokit.rest.actions.downloadWorkflowRunLogs({
+            owner,
+            repo,
+            run_id: runId,
+        });
+
+        if (!logBuffer) {
+            console.log('⚠️ No logs found or empty response.');
+            return;
+        }
+
+        // Save the zip file
+        const outputDir = path.join(process.env.GITHUB_WORKSPACE || '.', 'fetched-logs');
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+        const zipPath = path.join(outputDir, `run-${runId}-logs.zip`);
+        fs.writeFileSync(zipPath, Buffer.from(logBuffer));
+        console.log(`✅ Logs saved to zip: ${zipPath}`);
+
+        // Extract the zip
+        try {
+            execSync(`unzip -o "${zipPath}" -d "${outputDir}"`);
+            console.log('✅ Zip extracted.');
+        } catch (e) {
+            console.error('❌ Failed to extract zip:', e.message);
+            return;
+        }
+
+        // List extracted files
+        function listFiles(dir) {
+            let results = [];
+            const files = fs.readdirSync(dir);
+            for (const file of files) {
+                const fullPath = path.join(dir, file);
+                const stat = fs.statSync(fullPath);
+                if (stat.isDirectory()) {
+                    results = results.concat(listFiles(fullPath));
+                } else {
+                    results.push(fullPath);
+                }
+            }
+            return results;
+        }
+        const extractedFiles = listFiles(outputDir);
+        console.log('📄 Extracted files:');
+        extractedFiles.forEach(f => console.log('  -', f));
+    } catch (error) {
+        console.error('❌ Failed to fetch or extract logs:', error.message);
+    }
+}
+
+if (require.main === require.cache[eval('__filename')]) {
+    run();
+}
+module.exports = __webpack_exports__;
 /******/ })()
 ;
