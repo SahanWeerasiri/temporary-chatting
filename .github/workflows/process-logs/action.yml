@@ -4,7 +4,7 @@ inputs:
     github-token:
         description: "GitHub token"
         required: true
-        default: ${{ github.token }} # Correct context
+        default: ${{ github.token }}
     run-id:
         description: "Workflow run ID (defaults to current run)"
         required: false

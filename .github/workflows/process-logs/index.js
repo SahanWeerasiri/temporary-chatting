@@ -13,7 +13,10 @@ async function run() {
         const context = github.context;
 
         const runId = specifiedRunId || context.runId;
-        const [owner, repo] = context.repo.split('/');
+
+        // Get owner and repo from context
+        const owner = context.repo.owner;
+        const repo = context.repo.repo;
 
         console.log(`🔍 Fetching logs for run: ${runId}`);
         console.log(`📁 Repository: ${owner}/${repo}`);
@@ -57,11 +60,15 @@ async function run() {
         // Combine all logs
         const combinedLogs = [];
         for (const logFile of logFiles) {
-            const content = fs.readFileSync(logFile, 'utf8');
-            const fileName = path.relative(outputDir, logFile);
-            combinedLogs.push(`=== ${fileName} ===`);
-            combinedLogs.push(content);
-            combinedLogs.push(''); // Empty line between files
+            try {
+                const content = fs.readFileSync(logFile, 'utf8');
+                const fileName = path.relative(outputDir, logFile);
+                combinedLogs.push(`=== ${fileName} ===`);
+                combinedLogs.push(content);
+                combinedLogs.push(''); // Empty line between files
+            } catch (error) {
+                console.warn(`⚠️ Could not read file ${logFile}: ${error.message}`);
+            }
         }
 
         const combinedPath = path.join(outputDir, 'combined-logs.txt');
@@ -80,8 +87,14 @@ async function run() {
 
     } catch (error) {
         core.setFailed(`Failed to fetch logs: ${error.message}`);
+        console.error('Full error details:', error);
         throw error;
     }
 }
 
-run();
+// Export for testing if needed
+if (require.main === module) {
+    run();
+}
+
+module.exports = { run };
