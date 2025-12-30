@@ -29,7 +29,7 @@ runs:
                       \"run_id\": \"$RUN_ID\",
                       \"token\": \"$TOKEN\",
                       \"repository\": \"$REPO\",
-                      \"webhook_token\": "abc"
+                      \"webhook_token\": \"abc\"
                   }")
 
               HTTP_CODE=${RESPONSE: -3}
