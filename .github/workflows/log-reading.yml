@@ -20,7 +20,7 @@ jobs:
       - name: Register with log server
         uses: ./.github/actions/monitor
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.TOKEN }}
           run_id: ${{ github.run_id }}
 
       - name: Setup Node.js
