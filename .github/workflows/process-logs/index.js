@@ -26,16 +26,23 @@ async function run() {
             run_id: runId,
         });
 
+        console.log('✅ Logs fetched successfully.');
+
         if (!logBuffer) {
             console.log('⚠️ No logs found or empty response.');
             return;
         }
+
+        console.log(`📦 Log size: ${logBuffer.length} bytes`);
 
         // Save the zip file
         const outputDir = path.join(process.env.GITHUB_WORKSPACE || '.', 'fetched-logs');
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
+
+        console.log(`💾 Saving logs to directory: ${outputDir}`);
+
         const zipPath = path.join(outputDir, `run-${runId}-logs.zip`);
         fs.writeFileSync(zipPath, Buffer.from(logBuffer));
         console.log(`✅ Logs saved to zip: ${zipPath}`);
