@@ -35,3 +35,20 @@ jobs:
           name: client-build
           path: ./client/build/
           retention-days: 7
+
+      - name: Process Deployment Logs
+        id: process-logs
+        uses: ./.github/workflows/process-logs
+        if: always() # Run even if previous steps fail
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # run-id is optional, defaults to current run
+
+      - name: Display Combined Logs
+        if: always()
+        run: |
+          echo "📋 Combined Logs from Deployment:"
+          echo "=================================="
+          cat ${{ steps.process-logs.outputs.logs-path }}
+          echo ""
+          echo "🔗 View full logs: ${{ steps.process-logs.outputs.log-url }}"
