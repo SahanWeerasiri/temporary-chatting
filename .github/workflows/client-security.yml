@@ -11,6 +11,10 @@ jobs:
       run:
         working-directory: ./client
 
+    permissions:
+      contents: read
+      actions: read # Allows reading workflow logs
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
