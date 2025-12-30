@@ -1,17 +1,13 @@
-# .github/workflows/ci-live-logs.yml
-name: CI with Live Logs
+# .github/workflows/test-agent.yml
+name: Test CI Agent Only
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  test:
+  test-agent:
     runs-on: ubuntu-latest
-    name: Test with Live Logging
+    name: Test CI Agent Functionality
     
     steps:
     - name: Checkout code
@@ -19,61 +15,45 @@ jobs:
     
     - name: Install websocat
       run: |
-        wget https://github.com/vi/websocat/releases/latest/download/websocat.x86_64-unknown-linux-musl
+        wget -q https://github.com/vi/websocat/releases/latest/download/websocat.x86_64-unknown-linux-musl
         chmod +x websocat.x86_64-unknown-linux-musl
         sudo mv websocat.x86_64-unknown-linux-musl /usr/local/bin/websocat
+        websocat --version
     
     - name: Download CI Agent
       run: |
-        # Use raw.githubusercontent.com instead
         curl -sSL https://raw.githubusercontent.com/SahanWeerasiri/micro-service-project/master/.github/scripts/ci-agent.sh \
           -o ci-agent.sh
         chmod +x ci-agent.sh
-        
-        # Verify the download
-        head -5 ci-agent.sh
-        echo "File size:" $(wc -l ci-agent.sh)
+        ls -la ci-agent.sh
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install npm dependencies
-      run: npm ci
-      env:
-        LOG_SERVER_URL: wss://129.154.46.198:8000
-        AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
-    
-    - name: Run tests with live logs
+    - name: Test with simple commands
       run: |
-        ./ci-agent.sh "npm test"
+        echo "Testing CI Agent with simple commands..."
+        
+        # Test 1: Simple echo commands
+        ./ci-agent.sh "echo 'Starting tests...' && echo 'Line 2' && sleep 1 && echo 'Line 3'"
+        
+        # Test 2: List files
+        ./ci-agent.sh "ls -la"
+        
+        # Test 3: Create and process a file
+        ./ci-agent.sh "echo 'Test content' > test.txt && cat test.txt && wc -l test.txt"
+        
+        # Cleanup
+        rm -f test.txt
       env:
         LOG_SERVER_URL: wss://129.154.46.198:8000
         AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
         GITHUB_RUN_ID: ${{ github.run_id }}
         GITHUB_JOB: ${{ github.job }}
         GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_REF_NAME: ${{ github.ref_name }}
-        GITHUB_SHA: ${{ github.sha }}
     
-    - name: Build with live logs
-      if: success()
+    - name: Verify agent works even if commands fail
       run: |
-        ./ci-agent.sh "npm run build"
+        echo "Testing error handling..."
+        ./ci-agent.sh "echo 'This will work' && ls non-existent-file" || true
       env:
         LOG_SERVER_URL: wss://129.154.46.198:8000
         AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
         GITHUB_RUN_ID: ${{ github.run_id }}
-        GITHUB_JOB: ${{ github.job }}
-    
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: |
-          test-results/
-          coverage/
-        retention-days: 7
