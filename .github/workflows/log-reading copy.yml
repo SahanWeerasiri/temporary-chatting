@@ -1,9 +1,9 @@
-name: Log Reading
+name: Log Reading Copy
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   client-build-validation:
@@ -17,11 +17,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Register with log server
-        uses: ./.github/actions/monitor
+      # Setup real-time monitoring (ONCE)
+      - name: Setup Monitoring
+        uses: ./.github/actions/new
         with:
-          token: ${{ secrets.TOKEN }}
-          run_id: ${{ github.run_id }}
+          server-url: "http://129.154.46.198:3000"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
