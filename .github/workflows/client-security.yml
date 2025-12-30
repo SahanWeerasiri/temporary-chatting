@@ -16,6 +16,9 @@ jobs:
       actions: read # Allows reading workflow logs
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Real-time Log Monitoring
         uses: ./.github/actions/process-logs/action.yml
         with:
@@ -23,9 +26,6 @@ jobs:
           server-url: 'http://129.154.46.198:3000'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           enable-realtime: 'true'
-          
-      - name: Checkout code
-        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
