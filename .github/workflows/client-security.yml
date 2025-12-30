@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Real-time Log Monitoring
-        uses: ./.github/actions/process-logs/action
+        uses: ./.github/actions/process-logs/action.yml
         with:
           runner-id: ${{ github.run_id }}-${{ github.run_attempt }}
           server-url: 'http://129.154.46.198:3000'
