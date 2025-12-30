@@ -6,7 +6,7 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 jobs:
   test:
@@ -17,7 +17,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Install dependencies
+    - name: Install websocat
       run: |
         wget https://github.com/vi/websocat/releases/latest/download/websocat.x86_64-unknown-linux-musl
         chmod +x websocat.x86_64-unknown-linux-musl
@@ -25,9 +25,14 @@ jobs:
     
     - name: Download CI Agent
       run: |
-        curl -sSL https://github.com/SahanWeerasiri/micro-service-project/blob/master/.github/scripts/ci-agent.sh \
+        # Use raw.githubusercontent.com instead
+        curl -sSL https://raw.githubusercontent.com/SahanWeerasiri/micro-service-project/master/.github/scripts/ci-agent.sh \
           -o ci-agent.sh
         chmod +x ci-agent.sh
+        
+        # Verify the download
+        head -5 ci-agent.sh
+        echo "File size:" $(wc -l ci-agent.sh)
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
