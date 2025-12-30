@@ -45,7 +45,7 @@ jobs:
         uses: ./.github/workflows/process-logs
         if: always() # Run even if previous steps fail
         with:
-          run-id: ${{ github.run_id }}
+          # run-id: ${{ github.run_id }}
           github-token: ${{ secrets.TOKEN }}
           # run-id is optional, defaults to current run
 
