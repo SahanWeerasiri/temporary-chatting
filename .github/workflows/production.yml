@@ -40,16 +40,16 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-          
+
           cd /home/ubuntu/temporary-chatting && git pull origin main --no-rebase && docker-compose up -d --build
-          
+
           echo "⏳ Waiting for services to start..."
           sleep 5
-          
+
           echo "✅ Deployment complete!"
           echo "📊 Container status:"
           docker-compose ps
-          
+
           EOF
 
       - name: Cleanup SSH Key

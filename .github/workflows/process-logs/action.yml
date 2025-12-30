@@ -1,0 +1,18 @@
+name: "Fetch GitHub Action Logs"
+description: "Fetch and analyze logs from GitHub Actions API"
+inputs:
+    github-token:
+        description: "GitHub token"
+        required: true
+        default: ${{ github.token }}
+    run-id:
+        description: "Workflow run ID (defaults to current run)"
+        required: false
+outputs:
+    logs-path:
+        description: "Path to downloaded logs"
+    log-url:
+        description: "URL to logs in GitHub UI"
+runs:
+    using: "node20"
+    main: "index.js"
