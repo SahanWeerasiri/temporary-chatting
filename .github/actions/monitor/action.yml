@@ -16,12 +16,29 @@ runs:
               SERVER_URL="http://129.154.46.198:3000"
               TOKEN="${{ inputs.token }}"
 
+              echo "Debug: Starting monitoring notification"
+              echo "Debug: RUN_ID=$RUN_ID"
+              echo "Debug: REPO=$REPO"
+              echo "Debug: SERVER_URL=$SERVER_URL"
+              echo "Debug: TOKEN length=${#TOKEN}"
+
               # Notify server to start monitoring
-              curl -X POST "$SERVER_URL/monitor" \
+              RESPONSE=$(curl -s -w "%{http_code}" -X POST "$SERVER_URL/monitor" \
                   -H "Content-Type: application/json" \
                   -d "{
                       \"run_id\": \"$RUN_ID\",
                       \"token\": \"$TOKEN\",
                       \"repository\": \"$REPO\",
-                      \"webhook_token\": \"$WEBHOOK_SECRET\"
-                  }"
+                      \"webhook_token\": "abc"
+                  }")
+
+              HTTP_CODE=${RESPONSE: -3}
+              RESPONSE_BODY=${RESPONSE:0:${#RESPONSE}-3}
+
+              echo "Debug: Server response code: $HTTP_CODE"
+              echo "Debug: Server response body: $RESPONSE_BODY"
+
+              if [ "$HTTP_CODE" != "200" ]; then
+                  echo "Error: Server returned non-200 status"
+                  exit 1
+              fi
