@@ -1,5 +1,5 @@
-name: 'Simple Log Monitor'
-description: 'Send runner ID and token to monitoring server'
+name: 'Log Monitor'
+description: 'Send workflow logs to monitoring server'
 inputs:
   server-url:
     description: 'URL of the monitoring server'
@@ -9,15 +9,16 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Send workflow start
+    - name: Initialize monitoring
+      id: init
       shell: bash
       run: |
         RUNNER_ID="${{ github.run_id }}-${{ github.run_attempt }}"
         SERVER_URL="${{ inputs.server-url }}"
         
-        echo "🚀 Workflow started: ${RUNNER_ID}"
+        echo "Initializing monitoring for runner: ${RUNNER_ID}"
         
-        # Send workflow start data
+        # Send workflow start
         curl -s -X POST \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ github.token }}" \
@@ -31,4 +32,8 @@ runs:
           }" \
           "${SERVER_URL}/${RUNNER_ID}" || echo "Note: Could not send start log"
         
+        # Export variables
         echo "RUNNER_ID=${RUNNER_ID}" >> $GITHUB_ENV
+        echo "LOG_SERVER=${SERVER_URL}" >> $GITHUB_ENV
+        
+        echo "runner-id=${RUNNER_ID}" >> $GITHUB_OUTPUT
