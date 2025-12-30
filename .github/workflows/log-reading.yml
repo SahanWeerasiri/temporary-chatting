@@ -18,7 +18,7 @@ jobs:
               uses: actions/checkout@v4
 
             - name: Register with log server
-              uses: ./.github/workflows/monitor
+              uses: ./.github/actions/monitor
               with:
                   token: ${{ github.token }}
 
