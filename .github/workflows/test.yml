@@ -19,12 +19,13 @@ jobs:
     
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y websocat jq
+        wget https://github.com/vi/websocat/releases/latest/download/websocat.x86_64-unknown-linux-musl
+        chmod +x websocat.x86_64-unknown-linux-musl
+        sudo mv websocat.x86_64-unknown-linux-musl /usr/local/bin/websocat
     
     - name: Download CI Agent
       run: |
-        curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/.github/scripts/ci-agent.sh \
+        curl -sSL https://github.com/SahanWeerasiri/micro-service-project/blob/master/.github/scripts/ci-agent.sh \
           -o ci-agent.sh
         chmod +x ci-agent.sh
     
