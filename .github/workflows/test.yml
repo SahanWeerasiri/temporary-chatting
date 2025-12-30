@@ -1,0 +1,73 @@
+# .github/workflows/ci-live-logs.yml
+name: CI with Live Logs
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test with Live Logging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y websocat jq
+    
+    - name: Download CI Agent
+      run: |
+        curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/.github/scripts/ci-agent.sh \
+          -o ci-agent.sh
+        chmod +x ci-agent.sh
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install npm dependencies
+      run: npm ci
+      env:
+        LOG_SERVER_URL: wss://129.154.46.198:8000
+        AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
+    
+    - name: Run tests with live logs
+      run: |
+        ./ci-agent.sh "npm test"
+      env:
+        LOG_SERVER_URL: wss://129.154.46.198:8000
+        AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+        GITHUB_JOB: ${{ github.job }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        GITHUB_SHA: ${{ github.sha }}
+    
+    - name: Build with live logs
+      if: success()
+      run: |
+        ./ci-agent.sh "npm run build"
+      env:
+        LOG_SERVER_URL: wss://129.154.46.198:8000
+        AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+        GITHUB_JOB: ${{ github.job }}
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          test-results/
+          coverage/
+        retention-days: 7
