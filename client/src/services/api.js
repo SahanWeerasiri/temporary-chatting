@@ -1,12 +1,18 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-    ? '/api'  // Will be proxied by nginx
-    : 'http://localhost:5000/api';
+// Get API URL from Choreo-injected config or fallback to localhost
+const getApiUrl = () => {
+    if (window.configs?.apiUrl) {
+        // Choreo production environment
+        return window.configs.apiUrl + '/api';
+    }
+    // Local development
+    return process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+};
 
 const api = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: getApiUrl(),
     headers: {
         'Content-Type': 'application/json'
     }
