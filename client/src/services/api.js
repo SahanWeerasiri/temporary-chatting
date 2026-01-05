@@ -3,11 +3,12 @@ import axios from 'axios';
 
 // Get API URL from Choreo-injected config or fallback to localhost
 const getApiUrl = () => {
-    if (window.configs?.apiUrl) {
-        // Choreo production environment
+    if (window.configs?.apiUrl && window.configs.apiUrl !== "") {
+        // Choreo production environment - connection URL already includes the service path
+        // Just append /api to match the server routes
         return window.configs.apiUrl + '/api';
     }
-    // Local development
+    // Local development or when no connection is configured
     return process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
 };
 
@@ -15,7 +16,8 @@ const api = axios.create({
     baseURL: getApiUrl(),
     headers: {
         'Content-Type': 'application/json'
-    }
+    },
+    withCredentials: false
 });
 
 // Add token to requests
