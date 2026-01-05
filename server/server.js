@@ -8,12 +8,17 @@ const userRoutes = require('./src/routes/users');
 const chatRoutes = require('./src/routes/chats');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint
+app.get('/healthz', (req, res) => {
+    res.status(200).json({ status: 'healthy' });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

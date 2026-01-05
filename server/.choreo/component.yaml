@@ -1,56 +1,14 @@
 # +required The configuration file schema version
-schemaVersion: 1.2
+schemaVersion: "1.2"
 
 # +optional Incoming connection details for the component
 endpoints:
-  - name: auth-endpoint
-    displayName: Auth Endpoint
+  - name: temporary-chat-api
+    displayName: Temporary Chat API
     service:
-      basePath: /auth
+      basePath: /
       port: 3000
     type: REST
     networkVisibilities:
       - Public
     schemaFilePath: openapi.yaml
-  - name: chats-endpoint
-    displayName: Chats Endpoint
-    service:
-      basePath: /chats
-      port: 3000
-    type: REST
-    networkVisibilities:
-      - Public
-    schemaFilePath: openapi.yaml
-  - name: users-endpoint
-    displayName: Users Endpoint
-    service:
-      basePath: /users
-      port: 3000
-    type: REST
-    networkVisibilities:
-      - Public
-    schemaFilePath: openapi.yaml
-
-dependencies:
-  connectionReferences:
-    - name: sample-connection
-      resourceRef: service:/SampleProject/SampleComponent/v1/abcd/PUBLIC
-
-configurations:
-  env:
-    - name: SAMPLE_ENV
-      valueFrom:
-        configForm:
-          displayName: Sample Env
-          required: false
-          type: string
-  file:
-    - name: config.yaml
-      mountPath: /src/resources
-      type: yaml
-      values:
-        - name: version
-          valueFrom:
-            configForm:
-              displayName: Version
-              type: number

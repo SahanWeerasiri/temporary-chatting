@@ -1,0 +1,530 @@
+openapi: 3.0.3
+info:
+  title: Temporary Chatting API
+  description: >-
+    REST API Service for a temporary chatting application with user authentication,
+    chat invitations, and real-time messaging
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.0.0
+externalDocs:
+  description: Choreo
+  url: https://choreo.dev
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: auth
+    description: Authentication endpoints
+  - name: users
+    description: User management endpoints
+  - name: chats
+    description: Chat management endpoints
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      operationId: RegisterUser
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCredentials"
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: Invalid request or username already exists
+        "500":
+          description: Server error
+
+  /api/auth/login:
+    post:
+      summary: Login user
+      operationId: LoginUser
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCredentials"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+        "500":
+          description: Server error
+
+  /api/auth/validate:
+    post:
+      summary: Validate authentication token
+      operationId: ValidateToken
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Token is valid
+        "401":
+          description: Invalid or expired token
+        "500":
+          description: Server error
+
+  /api/auth/logout:
+    post:
+      summary: Logout user
+      operationId: LogoutUser
+      tags:
+        - auth
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Logout successful
+        "401":
+          description: Unauthorized
+        "500":
+          description: Server error
+
+  /api/users/search:
+    get:
+      summary: Search users by username
+      operationId: SearchUsers
+      tags:
+        - users
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          description: Search query (minimum 2 characters)
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserBasic"
+        "400":
+          description: Invalid query
+        "401":
+          description: Unauthorized
+        "500":
+          description: Server error
+
+  /api/users/profile:
+    get:
+      summary: Get user profile
+      operationId: GetUserProfile
+      tags:
+        - users
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+        "500":
+          description: Server error
+
+  /api/chats/invite:
+    post:
+      summary: Send chat invitation to a user
+      operationId: SendInvitation
+      tags:
+        - chats
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+      responses:
+        "200":
+          description: Invitation sent successfully
+        "400":
+          description: Invalid request
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+        "500":
+          description: Server error
+
+  /api/chats/accept:
+    post:
+      summary: Accept chat invitation
+      operationId: AcceptInvitation
+      tags:
+        - chats
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fromUserId:
+                  type: string
+      responses:
+        "200":
+          description: Chat invitation accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  chat:
+                    $ref: "#/components/schemas/Chat"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Invitation not found
+        "500":
+          description: Server error
+
+  /api/chats/decline:
+    post:
+      summary: Decline chat invitation
+      operationId: DeclineInvitation
+      tags:
+        - chats
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fromUserId:
+                  type: string
+      responses:
+        "200":
+          description: Invitation declined successfully
+        "401":
+          description: Unauthorized
+        "404":
+          description: Invitation not found
+        "500":
+          description: Server error
+
+  /api/chats/{chatId}:
+    get:
+      summary: Get chat by ID
+      operationId: GetChat
+      tags:
+        - chats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          description: Chat ID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Chat not found
+        "500":
+          description: Server error
+    delete:
+      summary: Delete chat
+      operationId: DeleteChat
+      tags:
+        - chats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          description: Chat ID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Chat deleted successfully
+        "401":
+          description: Unauthorized
+        "404":
+          description: Chat not found
+        "500":
+          description: Server error
+
+  /api/chats/{chatId}/messages:
+    get:
+      summary: Get messages for a chat
+      operationId: GetMessages
+      tags:
+        - chats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          description: Chat ID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Message"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Chat not found
+        "500":
+          description: Server error
+    post:
+      summary: Send a message in a chat
+      operationId: SendMessage
+      tags:
+        - chats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          description: Chat ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+      responses:
+        "201":
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Chat not found
+        "500":
+          description: Server error
+
+  /healthz:
+    get:
+      summary: Health check endpoint
+      operationId: HealthCheck
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserCredentials:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "johndoe"
+        password:
+          type: string
+          format: password
+          example: "password123"
+
+    UserBasic:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        username:
+          type: string
+          example: "johndoe"
+
+    UserResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "User registered successfully"
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            authToken:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Login successful"
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            authToken:
+              type: string
+            pendingInvites:
+              type: array
+              items:
+                type: object
+            activeChats:
+              type: array
+              items:
+                type: string
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        pendingInvites:
+          type: array
+          items:
+            type: object
+            properties:
+              fromUserId:
+                type: string
+              fromUsername:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+        activeChats:
+          type: array
+          items:
+            type: string
+
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        user1Id:
+          type: string
+        user2Id:
+          type: string
+        user1Username:
+          type: string
+        user2Username:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        senderId:
+          type: string
+        text:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
