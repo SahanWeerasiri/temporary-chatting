@@ -2,8 +2,8 @@ name: Log Reading Copy
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
 
 jobs:
   client-build-validation:
