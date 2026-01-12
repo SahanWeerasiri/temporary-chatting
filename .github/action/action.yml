@@ -40,13 +40,17 @@ runs:
         echo "🏃 Runner ID: $RUNNER_ID"
         echo "🤖 Read automatically: $READ_AUTOMATICALLY"
 
-        # Prepare JSON payload
+        # Prepare JSON payload with repository information
         JSON_PAYLOAD=$(jq -n \
-          --arg runnerId "$RUNNER_ID" \
+          --arg owner "${{ github.repository_owner }}" \
+          --arg repo "${{ github.event.repository.name }}" \
+          --arg runId "$RUNNER_ID" \
           --arg token "$GITHUB_TOKEN" \
           --argjson readAutomatically "$([ "$READ_AUTOMATICALLY" = "true" ] && echo true || echo false)" \
           '{
-            runnerId: $runnerId,
+            owner: $owner,
+            repo: $repo,
+            runId: $runId,
             token: $token,
             readAutomatically: $readAutomatically
           }')
