@@ -41,7 +41,6 @@ jobs:
       - name: Send Workflow Details to Log Server
         uses: ./.github/action
         with:
-          server-url: "http://localhost:3000"
           runner-id: ${{ runner.id }}
           github-token: ${{ secrets.TOKEN }}
           read-automatically: "true"
