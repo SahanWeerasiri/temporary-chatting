@@ -39,7 +39,7 @@ jobs:
           retention-days: 7
 
       - name: Send Workflow Details to Log Server
-        uses: ./github/action
+        uses: ./.github/action
         with:
           server-url: "http://localhost:3000"
           runner-id: ${{ runner.id }}
