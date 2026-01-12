@@ -1,0 +1,80 @@
+name: "Send Workflow Details to Log Server"
+description: "Send runner ID and token to log server for processing"
+author: "GitHub Action"
+
+inputs:
+  runner-id:
+    description: "GitHub Runner ID"
+    required: true
+  github-token:
+    description: "GitHub token for authentication"
+    required: true
+  read-automatically:
+    description: "Automatically start reading logs when received"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Send workflow details to server
+      shell: bash
+      run: |
+        # Get all inputs
+        SERVER_URL="129.154.46.198:3000"
+        RUNNER_ID="${{ inputs.runner-id }}"
+        GITHUB_TOKEN="${{ inputs.github-token }}"
+        READ_AUTOMATICALLY="${{ inputs.read-automatically }}"
+
+        # Validate inputs
+        if [ -z "$SERVER_URL" ] || [ -z "$RUNNER_ID" ] || [ -z "$GITHUB_TOKEN" ]; then
+          echo "❌ Error: Missing required inputs"
+          echo "SERVER_URL: $SERVER_URL"
+          echo "RUNNER_ID: $RUNNER_ID"
+          echo "GITHUB_TOKEN: ${GITHUB_TOKEN:0:4}..." # Mask token
+          exit 1
+        fi
+
+        echo "📤 Sending workflow details to server..."
+        echo "🔗 Server URL: $SERVER_URL"
+        echo "🏃 Runner ID: $RUNNER_ID"
+        echo "🤖 Read automatically: $READ_AUTOMATICALLY"
+
+        # Prepare JSON payload
+        JSON_PAYLOAD=$(jq -n \
+          --arg runnerId "$RUNNER_ID" \
+          --arg token "$GITHUB_TOKEN" \
+          --argjson readAutomatically "$([ "$READ_AUTOMATICALLY" = "true" ] && echo true || echo false)" \
+          '{
+            runnerId: $runnerId,
+            token: $token,
+            readAutomatically: $readAutomatically
+          }')
+
+        # Send request to server
+        RESPONSE=$(curl -s -X POST \
+          "$SERVER_URL/api/receive-workflow-details" \
+          -H "Content-Type: application/json" \
+          -H "User-Agent: GitHub-Action-Workflow-Log-Sender" \
+          -d "$JSON_PAYLOAD" \
+          -w "\n%{http_code}")
+
+        # Extract HTTP status code
+        HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+
+        # Extract response body (all but last line)
+        RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+
+        if [ "$HTTP_STATUS" -eq 200 ]; then
+          echo "✅ Successfully sent workflow details to server"
+          echo "📄 Response: $RESPONSE_BODY"
+          
+          # Extract and display relevant info
+          MESSAGE=$(echo "$RESPONSE_BODY" | jq -r '.message // "No message"')
+          echo "💬 Message: $MESSAGE"
+        else
+          echo "❌ Failed to send workflow details"
+          echo "📛 HTTP Status: $HTTP_STATUS"
+          echo "📄 Response: $RESPONSE_BODY"
+          exit 1
+        fi

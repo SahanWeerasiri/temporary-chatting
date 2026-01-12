@@ -2,8 +2,8 @@ name: Log Reading
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   client-build-validation:
@@ -16,12 +16,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Register with log server
-        uses: ./.github/actions/monitor
-        with:
-          token: ${{ secrets.TOKEN }}
-          run_id: ${{ github.run_id }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,3 +37,11 @@ jobs:
           name: client-build
           path: ./client/build/
           retention-days: 7
+
+      - name: Send Workflow Details to Log Server
+        uses: ./action
+        with:
+          server-url: "http://localhost:3000"
+          runner-id: ${{ runner.id }}
+          github-token: ${{ secrets.TOKEN }}
+          read-automatically: "true"
